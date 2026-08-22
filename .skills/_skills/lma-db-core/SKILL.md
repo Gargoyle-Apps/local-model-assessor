@@ -26,8 +26,8 @@ Load when the user needs to initialize, migrate, or query the database; when a s
 
 ### 1. Database location
 
-- **Path:** `model-data/model-assessor.db` (SQLite).
-- **Env override:** `LMA_DB` locates the DB for Python scripts, `query-db.sh`, `init-db.sh`, and `migrate-schema.sh`.
+- **Path:** `model-data/model-assessor.db` under the resolved LMA root (SQLite).
+- **Env overrides:** `LMA_DB` selects an explicit DB for every consumer. Without it, `LMA_ROOT` relocates the default for Python scripts, `query-db.sh`, `init-db.sh`, and `migrate-schema.sh`.
 - **Optional LMO:** LMO may consume this DB via `LMA_DB` / `LMA_ROOT`. Hardware and software YAML may live in LMO; resolve with `./scripts/py scripts/lma_paths.py`. See `lma-lmo-sidecar` and `integrations/lmo/lma-lmo-contract.md`.
 
 ### 2. Init and migrate
@@ -79,7 +79,7 @@ For explanatory workflows, use `./scripts/query-db.sh --readonly "SQL"`. Missing
 
 - **Scripts (flags):** `query-db.sh "SQL"` — always pass SQL string. `init-db.sh` / `migrate-schema.sh` — empty DB / schema migrations.
 - **Python:** `./scripts/py scripts/<name>.py` (see `lma-python-env` skill). `add-model-from-yaml.py` — provenance via args or env. `export-assessed-models.py [path]`. `import-profiles.py [db]`. `generate-ide-config.py --target continue|cline [--active-only] [--dry-run]`. `sweep-ide-config.py` — run after model add/remove or clone create (see `lma-ide-config` skill). `generate-stack-handoff.py [--output-dir DIR]`.
-- **Env:** `LMA_DB` overrides the DB path for Python scripts, `query-db.sh`, `init-db.sh`, and `migrate-schema.sh`. `LMA_HARDWARE_PROFILE`, `LMA_SOFTWARE_PROFILE`, `LMO_ROOT`, and `LMA_ROOT` are optional LMO sidecar overrides.
+- **Env:** `LMA_DB` overrides the DB path for every consumer. Without it, `LMA_ROOT` relocates the default DB for Python scripts and DB shell wrappers. `LMA_HARDWARE_PROFILE`, `LMA_SOFTWARE_PROFILE`, and `LMO_ROOT` are optional LMO sidecar overrides.
 
 ### 7. Hardware budget and co-run rule
 

@@ -15,7 +15,6 @@ from __future__ import annotations
 
 import argparse
 import importlib.util
-import os
 import shutil
 import sqlite3
 import subprocess
@@ -36,7 +35,6 @@ except ImportError:
     sys.exit(1)
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
-DEFAULT_DB = REPO_ROOT / "model-data" / "model-assessor.db"
 
 _SCRIPTS = Path(__file__).resolve().parent
 if str(_SCRIPTS) not in sys.path:
@@ -297,9 +295,10 @@ def main():
     args = parser.parse_args()
 
     active_only = not args.all_provisioned
-    db_path = Path(os.environ.get("LMA_DB", str(DEFAULT_DB)))
-    if not db_path.exists():
-        print(f"Error: {db_path} not found. Run init-db.sh first.", file=sys.stderr)
+    try:
+        db_path = lma_paths.require_db_path()
+    except lma_paths.PathResolutionError as exc:
+        print(f"Error: {exc}", file=sys.stderr)
         sys.exit(1)
 
     profile = _read_software_profile()

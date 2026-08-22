@@ -29,8 +29,13 @@ import textwrap
 from pathlib import Path
 from typing import Any, Optional
 
-REPO_ROOT = Path(__file__).resolve().parent.parent
-DEFAULT_DB = REPO_ROOT / "model-data" / "model-assessor.db"
+_SCRIPTS = Path(__file__).resolve().parent
+if str(_SCRIPTS) not in sys.path:
+    sys.path.insert(0, str(_SCRIPTS))
+
+import lma_paths  # noqa: E402
+
+REPO_ROOT = _SCRIPTS.parent
 DEFAULT_OUT = REPO_ROOT / "integrations" / "embed-retrieval-stack" / "out"
 SCHEMA_SQL = REPO_ROOT / "integrations" / "embed-retrieval-stack" / "init" / "02-schema.sql"
 OLLAMA_DEFAULT = os.environ.get("OLLAMA_HOST", "http://127.0.0.1:11434")
@@ -342,9 +347,10 @@ def main() -> None:
     )
     args = parser.parse_args()
 
-    db_path = Path(os.environ.get("LMA_DB", str(DEFAULT_DB)))
-    if not db_path.exists():
-        print(f"Error: {db_path} not found. Run init-db.sh first.", file=sys.stderr)
+    try:
+        db_path = lma_paths.require_db_path()
+    except lma_paths.PathResolutionError as exc:
+        print(f"Error: {exc}", file=sys.stderr)
         sys.exit(1)
 
     try:

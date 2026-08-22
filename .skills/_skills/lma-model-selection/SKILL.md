@@ -19,7 +19,7 @@ triggers:
 dependencies:
   - lma-db-core
   - lma-ide-config
-version: "1.2.0"
+version: "1.2.1"
 ---
 
 # LMA Model Selection
@@ -49,10 +49,10 @@ Run `ollama list` and compare against DB records. If a model is in the DB but no
 ### 4. Check hardware budget
 
 ```bash
-grep -A5 vram_budget computer-profile/hardware-profile.yaml
+./scripts/py scripts/lma_paths.py
 ```
 
-Effective budget ≈ `total_available - os_headroom_gb`.
+Read `vram_budget` from the resolved `hardware_profile` path. Effective budget ≈ `total_available - os_headroom_gb`.
 
 **Co-run rule:** `(model_vram + concurrency_reserve) < total_available` → can co-run. Heavy Lifters (30–48 GB) run solo.
 

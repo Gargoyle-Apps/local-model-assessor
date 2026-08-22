@@ -11,7 +11,7 @@ triggers:
 dependencies:
   - lma-assess-import-model
   - lma-ide-config
-version: "1.2.0"
+version: "1.2.1"
 ---
 
 # LMA HF GGUF → Ollama
@@ -32,7 +32,7 @@ Skip if user already supplied a URL or local `.gguf` path.
 
 ### 1. Pre-flight: hardware check
 
-Read `computer-profile/hardware-profile.yaml` and confirm the GGUF size / quant fits the machine's VRAM budget. Do not proceed if it won't fit.
+Run `./scripts/py scripts/lma_paths.py`, read the resolved `hardware_profile` path, and confirm the GGUF size / quant fits its VRAM budget. Do not proceed if it won't fit.
 
 ### 2. Understand the key semantics
 
@@ -92,7 +92,7 @@ Follow the standard assessment flow from `lma-assess-import-model`:
 
 ### Checklist
 
-- [ ] Read `hardware-profile.yaml`; confirm GGUF size / quant fits.
+- [ ] Resolved the live hardware profile with `lma_paths.py`; confirmed GGUF size / quant fits.
 - [ ] User has (or will) download the `.gguf` to a known path; base `.mf` references that path.
 - [ ] Stable `model_id` chosen; `install` set to exact `ollama create … -f …`.
 - [ ] Assessment YAML filled including `provisioning` aligned with `by_role`.

@@ -3,10 +3,11 @@
 # Run from repo root: ./scripts/init-db.sh
 
 set -e
-REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-# LMA_DB: absolute path override (LMO sidecar or tests). Same as Python scripts.
+SCRIPT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+REPO_ROOT="${LMA_ROOT:-$SCRIPT_ROOT}"
+# LMA_DB overrides the path; otherwise LMA_ROOT relocates the default.
 DB_PATH="${LMA_DB:-$REPO_ROOT/model-data/model-assessor.db}"
-SCHEMA="${REPO_ROOT}/scripts/schema.sql"
+SCHEMA="${SCRIPT_ROOT}/scripts/schema.sql"
 
 mkdir -p "$(dirname "$DB_PATH")"
 if [ -f "$DB_PATH" ]; then

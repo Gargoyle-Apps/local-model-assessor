@@ -18,13 +18,18 @@ content: |
   ```bash
   # Python: read requirements.txt — use repo .venv (PEP 668-safe). See lma-python-env skill.
   ./scripts/bootstrap-python.sh
-  # Create DB and profiles (if missing)
-  [ -f model-data/model-assessor.db ] || ./scripts/init-db.sh
+  # Create the resolved DB if missing. LMA_DB wins; otherwise LMA_ROOT relocates the default.
+  lma_data_root="${LMA_ROOT:-$PWD}"
+  if [ -n "${LMA_DB:-}" ]; then
+    [ -f "$LMA_DB" ] || ./scripts/init-db.sh
+  else
+    [ -f "$lma_data_root/model-data/model-assessor.db" ] || ./scripts/init-db.sh
+  fi
   ./scripts/py scripts/lma_paths.py
-  # Standalone only: if hardware/software source is missing or template and LMO is not linked:
-  [ -f computer-profile/hardware-profile.yaml ] || cp computer-profile/hardware-profile.template.yaml computer-profile/hardware-profile.yaml
-  [ -f computer-profile/software-profile.yaml ] || cp computer-profile/software-profile.template.yaml computer-profile/software-profile.yaml
-  # Import resolved profiles into DB
+  ```
+  Inspect the resolver output before importing. Only when `linked` is `false`, copy a local profile whose reported source is `template` or `missing`, edit it with real facts, then rerun `lma_paths.py`. Never create local fallback profiles during a linked LMO workflow.
+  After the resolved profiles contain real hardware and software facts, import them:
+  ```bash
   ./scripts/py scripts/import-profiles.py
   ```
   If migrating from a legacy model-lookup.json, convert it to YAML and run `./scripts/py scripts/add-model-from-yaml.py model-data/new-models.yaml`.

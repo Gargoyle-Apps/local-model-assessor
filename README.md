@@ -265,11 +265,13 @@ Live sharing is **absolute local paths** (environment variables or gitignored `i
 ./scripts/py scripts/lma_paths.py --format json
 ```
 
-Pack a study zip of the current hardware YAML, software YAML, and model DB (writes gitignored `ref/lma-lmo-snapshot.zip`):
+Pack a local study zip of the current hardware YAML, software YAML, and model DB (writes gitignored `ref/lma-lmo-snapshot.zip`):
 
 ```bash
 ./scripts/py scripts/export-lmo-snapshot.py
 ```
+
+The archive contains the full database and absolute local paths. Keep it on this machine; do not upload or send it externally.
 
 Full contract: [integrations/lmo/lma-lmo-contract.md](integrations/lmo/lma-lmo-contract.md). Agent workflow: [`lma-lmo-sidecar`](.skills/_skills/lma-lmo-sidecar/SKILL.md).
 

@@ -15,6 +15,12 @@ tree once the sister issue is resolved.
 | Software inventory YAML | LMO (when linked) | LMA | `computer-profile/software-profile.yaml` (from template) |
 | Model catalog SQLite | LMA | LMO | `model-data/model-assessor.db` |
 
+These are the only two owner-published data domains:
+
+- LMA publishes model assessment and management state in `model-assessor.db`;
+  LMO may read it.
+- LMO publishes live hardware and software inventory YAML; LMA may read it.
+
 LMA does not write LMO files. LMO does not write the LMA database. After LMO
 updates hardware or software YAML, re-run `./scripts/py scripts/import-profiles.py`
 so the last snapshot in SQLite matches the live files. LMO should read the live
@@ -60,6 +66,21 @@ Until LMO publishes its own layout, LMA looks under `LMO_ROOT` for:
 If those files are absent, LMA keeps using its local `computer-profile/` files
 or templates. Linking is opportunistic, not required.
 
+## Explicit non-goals
+
+The sidecar is not:
+
+- a command or event bus;
+- a shared workflow or task database;
+- a deployment or upgrade handshake;
+- a runtime telemetry or operational-feedback channel;
+- a place for LMO agent state, approvals, or orchestration state;
+- a reason to add LMO-specific tables or fields to the LMA schema.
+
+No third shared database or copied synchronization layer is required. Downstream
+application configuration remains a product feature outside this minimal
+artifact-sharing contract.
+
 ## Formats LMO should preserve
 
 Hardware and software YAML schemas are the tracked templates:
@@ -93,7 +114,9 @@ files → LMA local YAML/DB → templates (hardware/software only).
 
 Writes gitignored `ref/lma-lmo-snapshot.zip` (hardware YAML, software YAML,
 SQLite catalog, schema, templates, this contract). Use it to inspect formats.
-Use path passing for day-to-day work.
+Use path passing for day-to-day work. The archive contains the full database
+and absolute local paths; keep it on the local machine and do not attach it to
+GitHub issues, pull requests, or external messages.
 
 ## Standalone rule
 

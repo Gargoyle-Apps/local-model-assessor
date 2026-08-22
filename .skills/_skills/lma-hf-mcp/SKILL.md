@@ -13,7 +13,7 @@ triggers:
   - hf collections
   - mlx-community collections
 dependencies: []
-version: "1.3.1"
+version: "1.3.2"
 ---
 
 # LMA Hugging Face MCP + Hub REST API
@@ -90,7 +90,7 @@ After REST shortlist + MCP drill-down on **local-runnable** candidates:
 | GGUF not in Ollama | `lma-hf-gguf-ollama` |
 | MLX safetensors (`mlx-community/…`) | `lma-mlx-lm` |
 
-Gate on `computer-profile/hardware-profile.yaml` VRAM budget before assess. MCP does not replace live benchmarks.
+Run `./scripts/py scripts/lma_paths.py` and gate on the resolved hardware profile's VRAM budget before assess. MCP does not replace live benchmarks.
 
 **Scout notes:** `integrations/mcp/scout/` — log REST totals, MCP repo picks, VRAM fit. Example: `scout/mlx-community-collections.md`.
 

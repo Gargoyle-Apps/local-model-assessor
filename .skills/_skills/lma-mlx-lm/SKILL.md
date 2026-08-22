@@ -11,7 +11,7 @@ triggers:
   - safetensors model
 dependencies:
   - lma-assess-import-model
-version: "1.2.0"
+version: "1.2.1"
 ---
 
 # LMA MLX LM
@@ -31,7 +31,7 @@ Load when the user wants to run, assess, or import an **MLX-format model that is
 
 - **Apple Silicon Mac** (M1/M2/M3/M4/… — MLX does not run on Intel Macs)
 - **mlx-lm** installed: `uv pip install mlx-lm` (or `pip install mlx-lm`)
-- Sufficient **unified memory** for the quantized model size (check `hardware-profile.yaml`)
+- Sufficient **unified memory** for the quantized model size (resolve the live profile with `./scripts/py scripts/lma_paths.py`)
 
 ## Instructions
 
@@ -45,7 +45,7 @@ Skip if user already named a repo ID.
 
 ### 1. Pre-flight: hardware check
 
-Read `computer-profile/hardware-profile.yaml` and confirm the model's weight size fits the machine's unified memory budget. MLX models load entirely into unified memory — the effective budget is the same VRAM concept used for Ollama models.
+Run `./scripts/py scripts/lma_paths.py`, read the resolved `hardware_profile` path, and confirm the model's weight size fits its unified memory budget. MLX models load entirely into unified memory — the effective budget is the same VRAM concept used for Ollama models.
 
 For quantized models, rough size estimates:
 - **4-bit**: ~0.5 GB per billion parameters
@@ -135,7 +135,7 @@ IDEs that support custom OpenAI-compatible endpoints (Continue, Cline, etc.) can
 
 - [ ] Confirmed Apple Silicon Mac with sufficient unified memory
 - [ ] `mlx-lm` installed (`uv pip install mlx-lm`)
-- [ ] Model fits hardware budget (check `hardware-profile.yaml`)
+- [ ] Model fits the resolved live hardware budget
 - [ ] Tested model locally: `mlx_lm.generate --model <repo> --prompt "test"`
 - [ ] Assessment YAML filled with `runtime: mlx`, no `provisioning`
 - [ ] Ran `add-model-from-yaml.py` and `export-assessed-models.py`

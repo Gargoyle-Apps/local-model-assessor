@@ -6,14 +6,18 @@ Combines models table + model_docs with static header/template content.
 Run from repo root: ./scripts/py scripts/export-assessed-models.py
 """
 
-import os
 import sqlite3
 import sys
 from pathlib import Path
 from typing import Optional
 
-REPO_ROOT = Path(__file__).resolve().parent.parent
-DEFAULT_DB = REPO_ROOT / "model-data" / "model-assessor.db"
+_SCRIPTS = Path(__file__).resolve().parent
+if str(_SCRIPTS) not in sys.path:
+    sys.path.insert(0, str(_SCRIPTS))
+
+import lma_paths  # noqa: E402
+
+REPO_ROOT = _SCRIPTS.parent
 DEFAULT_MD = REPO_ROOT / "model-data" / "assessed-models.md"
 
 
@@ -62,12 +66,12 @@ def model_to_spec_table(m: dict, doc: Optional[dict]) -> str:
 
 
 def main():
-    db_path = Path(os.environ.get("LMA_DB", str(DEFAULT_DB)))
-    md_path = Path(sys.argv[1]) if len(sys.argv) > 1 else DEFAULT_MD
-
-    if not db_path.exists():
-        print(f"Error: {db_path} not found. Run init-db.sh first.", file=sys.stderr)
+    try:
+        db_path = lma_paths.require_db_path()
+    except lma_paths.PathResolutionError as exc:
+        print(f"Error: {exc}", file=sys.stderr)
         sys.exit(1)
+    md_path = Path(sys.argv[1]) if len(sys.argv) > 1 else DEFAULT_MD
 
     try:
         with sqlite3.connect(db_path) as conn:
@@ -228,15 +232,15 @@ For writing and creative tasks, choose based on stage:
     footer = """
 ## Role Architecture
 
-Run `sqlite3 model-data/model-assessor.db "SELECT role, variant, model_id FROM role_model ORDER BY role, variant"` for role mappings.
+Run `./scripts/query-db.sh "SELECT role, variant, model_id FROM role_model ORDER BY role, variant"` for role mappings.
 
 ## RAG Pipelines
 
-Run `sqlite3 model-data/model-assessor.db "SELECT * FROM rag_pipeline"` for pipeline configs.
+Run `./scripts/query-db.sh "SELECT * FROM rag_pipeline"` for pipeline configs.
 
 ## Quick Decision Tree
 
-Run `sqlite3 model-data/model-assessor.db "SELECT * FROM decision_tree"` for the decision tree.
+Run `./scripts/query-db.sh "SELECT * FROM decision_tree"` for the decision tree.
 """
 
     output = header + "\n".join(body_parts) + footer

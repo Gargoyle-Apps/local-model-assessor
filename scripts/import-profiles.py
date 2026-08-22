@@ -23,9 +23,13 @@ def main():
     if len(sys.argv) > 1:
         db_path = Path(sys.argv[1])
     else:
-        db_path = lma_paths.db_path().path
+        try:
+            db_path = lma_paths.require_db_path()
+        except lma_paths.PathResolutionError as e:
+            print(f"Error: {e}", file=sys.stderr)
+            sys.exit(1)
 
-    if db_path is None or not db_path.exists():
+    if not db_path.exists():
         print(f"Error: {db_path} not found. Run init-db.sh first.", file=sys.stderr)
         sys.exit(1)
 

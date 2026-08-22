@@ -83,6 +83,8 @@ Linked: {info['linked']}
 
 This zip is a **study pack**, not a live link. Production sharing uses absolute
 local paths between two clones (see integrations/lmo/lma-lmo-contract.md).
+It contains the full model database and absolute local paths. Keep it on this
+machine; do not upload it to GitHub or send it to an external service.
 
 ## Ownership
 

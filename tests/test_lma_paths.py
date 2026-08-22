@@ -1,6 +1,7 @@
 """Tests for optional LMO sidecar path resolution and snapshot export."""
 
 import importlib.util
+import shlex
 import sqlite3
 import sys
 import zipfile
@@ -91,6 +92,24 @@ class TestHardwareSoftwareResolution:
         assert resolved.path == hw.resolve()
         assert resolved.source == "lmo-link"
 
+    def test_lmo_root_env_overrides_link_file_root(self, isolated_roots, tmp_path, monkeypatch):
+        lma, old_lmo = isolated_roots
+        new_lmo = tmp_path / "new-lmo"
+        expected = _write(
+            new_lmo / "inventory" / "hardware-profile.yaml", "from: env-root\n"
+        )
+        _write(old_lmo / "inventory" / "hardware-profile.yaml", "from: link-root\n")
+        _write(
+            lma / "integrations" / "lmo" / "paths.yaml",
+            f"lmo_root: {old_lmo}\nhardware_profile: inventory/hardware-profile.yaml\n",
+        )
+        monkeypatch.setenv("LMO_ROOT", str(new_lmo))
+
+        resolved = lma_paths.hardware_profile_path()
+
+        assert resolved.path == expected.resolve()
+        assert resolved.source == "lmo-link"
+
     def test_lmo_root_conventional_path(self, isolated_roots, monkeypatch):
         _, lmo = isolated_roots
         sw = _write(lmo / "inventory" / "software-profile.yaml", "from: lmo-root\n")
@@ -117,10 +136,42 @@ class TestDbPath:
         assert resolved.path == db.resolve()
         assert resolved.source == "env"
 
+    def test_lma_db_env_missing_raises(self, isolated_roots, monkeypatch):
+        missing = isolated_roots[0] / "missing.db"
+        monkeypatch.setenv("LMA_DB", str(missing))
+        with pytest.raises(lma_paths.PathResolutionError, match="LMA_DB is set"):
+            lma_paths.db_path()
+
     def test_default_missing_keeps_path(self, isolated_roots):
         resolved = lma_paths.db_path()
         assert resolved.source == "missing"
         assert resolved.path == (isolated_roots[0] / "model-data" / "model-assessor.db").resolve()
+
+    def test_require_db_path_rejects_missing_default(self, isolated_roots):
+        with pytest.raises(lma_paths.PathResolutionError, match="model DB not found"):
+            lma_paths.require_db_path()
+
+
+def test_print_env_shell_quotes_paths(capsys):
+    info = {
+        "lma_root": "/tmp/LMA Root",
+        "lmo_root": "/tmp/LMO Root",
+        "db": {"path": "/tmp/LMA Root/model-data/model-assessor.db"},
+        "hardware_profile": {"path": "/tmp/LMO Root/inventory/hardware.yaml"},
+        "software_profile": {"path": "/tmp/LMO Root/inventory/software.yaml"},
+    }
+
+    lma_paths._print_env(info)
+
+    parsed = {}
+    for line in capsys.readouterr().out.splitlines():
+        tokens = shlex.split(line)
+        assert len(tokens) == 1
+        name, value = tokens[0].split("=", 1)
+        parsed[name] = value
+    assert parsed["LMA_ROOT"] == "/tmp/LMA Root"
+    assert parsed["LMO_ROOT"] == "/tmp/LMO Root"
+    assert parsed["LMA_DB"] == "/tmp/LMA Root/model-data/model-assessor.db"
 
 
 class TestSnapshotExport:

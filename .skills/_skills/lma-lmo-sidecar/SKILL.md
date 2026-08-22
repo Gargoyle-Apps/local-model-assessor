@@ -13,7 +13,7 @@ triggers:
 dependencies:
   - lma-python-env
   - lma-db-core
-version: "1.0.0"
+version: "1.0.2"
 ---
 
 # LMA LMO Sidecar
@@ -36,9 +36,13 @@ Both repos must be cloned on this machine. Share **absolute paths**, not copies,
 | Software YAML | LMO | `computer-profile/software-profile.yaml` |
 | Model SQLite | LMA | `model-data/model-assessor.db` |
 
+These are the only two owner-published domains: LMA publishes model assessment and management state for LMO to read; LMO publishes live hardware and software inventory for LMA to read. Cross-repo access is read-only.
+
 Never require LMO. If `LMO_ROOT` and `integrations/lmo/paths.yaml` are absent, continue with local profiles.
 
 Resolve path existence first. Batch remaining questions (LMO clone path, unlink vs fix) in one message.
+
+Keep the boundary minimal. Do not turn the sidecar into a command or event bus, shared workflow/task database, deployment or upgrade handshake, telemetry channel, store for LMO agent/approval/orchestration state, or reason to add LMO-specific LMA schema fields. Downstream application configuration remains outside this contract.
 
 ### 2. Resolve live paths
 
@@ -64,7 +68,7 @@ If LMO has not created `inventory/` yet, leave LMA on local `computer-profile/` 
 ./scripts/py scripts/export-lmo-snapshot.py
 ```
 
-Writes `ref/lma-lmo-snapshot.zip` (gitignored): live hardware YAML, software YAML, `model-assessor.db`, `schema.sql`, templates, contract. Tell the user the zip path. Treat it as a study pack, not a live feed.
+Writes `ref/lma-lmo-snapshot.zip` (gitignored): live hardware YAML, software YAML, `model-assessor.db`, `schema.sql`, templates, contract. Tell the user the zip path. Treat it as a local study pack, not a live feed. It contains the full DB and absolute local paths; do not upload it to GitHub or send it outside the machine.
 
 ### 5. What LMO should read
 

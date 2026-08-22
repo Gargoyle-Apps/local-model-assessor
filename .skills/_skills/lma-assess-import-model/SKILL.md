@@ -23,7 +23,7 @@ dependencies:
   - lma-python-env
   - lma-db-core
   - lma-ide-config
-version: "1.3.0"
+version: "1.3.1"
 ---
 
 # LMA Assess & Import Model
@@ -58,7 +58,7 @@ Read `LLM-prompts/model-assessment-prompt.yaml` for the full assessment rubric. 
 - Constraint flags (`by_constraint`) — vision, tools, reasoning, etc.
 - Provisioning config — per-role Modelfile overrides (context, temperature, system prompt).
 
-Gate all assessments on `computer-profile/hardware-profile.yaml` — especially `vram_budget`, `context_strategy`, and heavy-lifter / co-run rules. Do not assume full advertised context from the upstream card.
+Run `./scripts/py scripts/lma_paths.py`, read the resolved `hardware_profile` path, and gate all assessments on that file — especially `vram_budget`, `context_strategy`, and heavy-lifter / co-run rules. Do not assume full advertised context from the upstream card.
 
 ### 3. Write assessment YAML
 

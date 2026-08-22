@@ -26,6 +26,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import shlex
 import sys
 from dataclasses import dataclass
 from pathlib import Path
@@ -112,12 +113,25 @@ def _existing_file(path: Path) -> Optional[Path]:
 def db_path() -> ResolvedPath:
     raw = os.environ.get("LMA_DB")
     if raw:
-        return ResolvedPath(Path(raw).expanduser().resolve(), "env")
+        path = Path(raw).expanduser().resolve()
+        if not path.is_file():
+            raise PathResolutionError(f"LMA_DB is set but not a file: {path}")
+        return ResolvedPath(path, "env")
     default = lma_root() / "model-data" / "model-assessor.db"
     found = _existing_file(default)
     if found:
         return ResolvedPath(found, "local")
     return ResolvedPath(default, "missing")
+
+
+def require_db_path() -> Path:
+    """Return the resolved existing DB path or raise a user-facing error."""
+    resolved = db_path()
+    if resolved.path is None or not resolved.path.is_file():
+        raise PathResolutionError(
+            f"model DB not found at {resolved.path or '(unset)'}. Run ./scripts/init-db.sh first."
+        )
+    return resolved.path
 
 
 def _profile(
@@ -138,10 +152,10 @@ def _profile(
     link = _load_link()
     if link.get(link_key):
         root = None
-        if link.get("lmo_root"):
-            root = Path(str(link["lmo_root"])).expanduser().resolve()
-        elif os.environ.get("LMO_ROOT"):
+        if os.environ.get("LMO_ROOT"):
             root = Path(os.environ["LMO_ROOT"]).expanduser().resolve()
+        elif link.get("lmo_root"):
+            root = Path(str(link["lmo_root"])).expanduser().resolve()
         declared = _resolve_declared(str(link[link_key]), base=root)
         if not declared.is_file():
             raise PathResolutionError(
@@ -218,15 +232,18 @@ def _print_text(info: dict) -> None:
 
 
 def _print_env(info: dict) -> None:
-    print(f"LMA_ROOT={info['lma_root']}")
+    def assignment(name: str, value: str) -> None:
+        print(f"{name}={shlex.quote(value)}")
+
+    assignment("LMA_ROOT", info["lma_root"])
     if info["lmo_root"]:
-        print(f"LMO_ROOT={info['lmo_root']}")
+        assignment("LMO_ROOT", info["lmo_root"])
     if info["db"]["path"]:
-        print(f"LMA_DB={info['db']['path']}")
+        assignment("LMA_DB", info["db"]["path"])
     if info["hardware_profile"]["path"]:
-        print(f"LMA_HARDWARE_PROFILE={info['hardware_profile']['path']}")
+        assignment("LMA_HARDWARE_PROFILE", info["hardware_profile"]["path"])
     if info["software_profile"]["path"]:
-        print(f"LMA_SOFTWARE_PROFILE={info['software_profile']['path']}")
+        assignment("LMA_SOFTWARE_PROFILE", info["software_profile"]["path"])
 
 
 def main() -> int:

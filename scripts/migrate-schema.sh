@@ -4,11 +4,12 @@
 # Run from repo root: ./scripts/migrate-schema.sh
 # Safe to run multiple times; skips if column already exists.
 #
-# Env: LMA_DB — optional absolute path to the SQLite file (default:
-#   $REPO_ROOT/model-data/model-assessor.db). Same override as Python scripts.
+# Env: LMA_DB overrides the SQLite file. Without it, LMA_ROOT relocates the
+#   default model-data/model-assessor.db. Same contract as Python scripts.
 
 set -e
-REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+SCRIPT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+REPO_ROOT="${LMA_ROOT:-$SCRIPT_ROOT}"
 DB_PATH="${LMA_DB:-$REPO_ROOT/model-data/model-assessor.db}"
 
 if [ ! -f "$DB_PATH" ]; then

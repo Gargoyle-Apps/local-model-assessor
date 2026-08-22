@@ -4,7 +4,8 @@
 
 set -e
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-DB_PATH="${REPO_ROOT}/model-data/model-assessor.db"
+# LMA_DB: absolute path override (LMO sidecar or tests). Same as Python scripts.
+DB_PATH="${LMA_DB:-$REPO_ROOT/model-data/model-assessor.db}"
 SCHEMA="${REPO_ROOT}/scripts/schema.sql"
 
 mkdir -p "$(dirname "$DB_PATH")"

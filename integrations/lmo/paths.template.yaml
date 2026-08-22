@@ -1,0 +1,15 @@
+# Optional LMO sidecar link (gitignored as paths.yaml).
+# LMA works without this file. Copy only when Local Model Orchestrator is
+# cloned next to this repo and you want LMA to consume LMO-owned profiles.
+#
+#   cp integrations/lmo/paths.template.yaml integrations/lmo/paths.yaml
+#
+# Env vars override this file:
+#   LMO_ROOT, LMA_HARDWARE_PROFILE, LMA_SOFTWARE_PROFILE, LMA_DB, LMA_ROOT
+#
+# Relative hardware_profile / software_profile paths are resolved against lmo_root.
+
+lmo_root: /absolute/path/to/local-model-orchestrator
+
+hardware_profile: inventory/hardware-profile.yaml
+software_profile: inventory/software-profile.yaml

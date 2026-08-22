@@ -13,7 +13,7 @@ triggers:
   - data flow
   - key queries
 dependencies: []
-version: "1.1.1"
+version: "1.2.0"
 ---
 
 # LMA Database Core
@@ -27,7 +27,8 @@ Load when the user needs to initialize, migrate, or query the database; when a s
 ### 1. Database location
 
 - **Path:** `model-data/model-assessor.db` (SQLite).
-- **Env override:** Python scripts, `migrate-schema.sh`, and `query-db.sh` respect `LMA_DB` to locate the DB file.
+- **Env override:** `LMA_DB` locates the DB for Python scripts, `query-db.sh`, `init-db.sh`, and `migrate-schema.sh`.
+- **Optional LMO:** LMO may consume this DB via `LMA_DB` / `LMA_ROOT`. Hardware and software YAML may live in LMO; resolve with `./scripts/py scripts/lma_paths.py`. See `lma-lmo-sidecar` and `integrations/lmo/lma-lmo-contract.md`.
 
 ### 2. Init and migrate
 
@@ -66,7 +67,7 @@ For explanatory workflows, use `./scripts/query-db.sh --readonly "SQL"`. Missing
 | Script / Prompt | Inputs | Outputs |
 |-----------------|--------|---------|
 | `init-db.sh` | `scripts/schema.sql` | `model-data/model-assessor.db` |
-| `import-profiles.py` | `computer-profile/*.yaml` | DB (`hardware_profile`, `software_profile`) |
+| `import-profiles.py` | resolved hardware/software YAML (`lma_paths.py`; LMO or local) | DB (`hardware_profile`, `software_profile`) |
 | `add-model-from-yaml.py` | `model-data/new-models.yaml` | DB (`models`, `role_model`, `constraint_model`, `model_docs`, `provisioned_models`); writes `model-data/modelfile/*.mf` |
 | `export-assessed-models.py` | DB | `model-data/assessed-models.md` |
 | `generate-ide-config.py` | DB (`provisioned_models`, `models`) | `integrations/IDE-model-management/<app>/` config files |
@@ -78,15 +79,15 @@ For explanatory workflows, use `./scripts/query-db.sh --readonly "SQL"`. Missing
 
 - **Scripts (flags):** `query-db.sh "SQL"` — always pass SQL string. `init-db.sh` / `migrate-schema.sh` — empty DB / schema migrations.
 - **Python:** `./scripts/py scripts/<name>.py` (see `lma-python-env` skill). `add-model-from-yaml.py` — provenance via args or env. `export-assessed-models.py [path]`. `import-profiles.py [db]`. `generate-ide-config.py --target continue|cline [--active-only] [--dry-run]`. `sweep-ide-config.py` — run after model add/remove or clone create (see `lma-ide-config` skill). `generate-stack-handoff.py [--output-dir DIR]`.
-- **Env:** `LMA_DB` overrides the DB path for Python scripts, `migrate-schema.sh`, and `query-db.sh`.
+- **Env:** `LMA_DB` overrides the DB path for Python scripts, `query-db.sh`, `init-db.sh`, and `migrate-schema.sh`. `LMA_HARDWARE_PROFILE`, `LMA_SOFTWARE_PROFILE`, `LMO_ROOT`, and `LMA_ROOT` are optional LMO sidecar overrides.
 
 ### 7. Hardware budget and co-run rule
 
 ```bash
-grep -A5 vram_budget computer-profile/hardware-profile.yaml
+./scripts/py scripts/lma_paths.py
 ```
 
-Effective budget ≈ `total_available - os_headroom_gb`.
+Effective budget ≈ `total_available - os_headroom_gb` on the resolved hardware YAML.
 
 **Co-run rule:** `(model_vram + concurrency_reserve) < total_available` → can co-run. Heavy Lifters (30–48 GB) run solo.
 

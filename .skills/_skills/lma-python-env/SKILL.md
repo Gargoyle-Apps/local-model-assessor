@@ -17,7 +17,7 @@ version: "1.0.0"
 
 ## When to use this skill
 
-Load before running **any** Python script in this repo (`add-model-from-yaml.py`, `export-assessed-models.py`, `import-profiles.py`, `generate-ide-config.py`, `sweep-ide-config.py`, `generate-stack-handoff.py`). Also load when the user hits PEP 668 errors, venv issues, or asks about the Python setup.
+Load before running **any** Python script in this repo (`add-model-from-yaml.py`, `export-assessed-models.py`, `import-profiles.py`, `generate-ide-config.py`, `sweep-ide-config.py`, `generate-stack-handoff.py`, `lma_paths.py`, `export-lmo-snapshot.py`). Also load when the user hits PEP 668 errors, venv issues, or asks about the Python setup.
 
 ## Instructions
 

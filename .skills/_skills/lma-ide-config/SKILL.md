@@ -41,7 +41,7 @@ Run after any of these events (do not wait for the user to ask):
 The sweep script:
 
 1. Sets `provisioned_models.is_active` from `ollama list` (installed → `1`, missing → `0`).
-2. Regenerates config for targets named in `computer-profile/software-profile.yaml` (`primary_agent`, `embedded_assistant`, `optional_agents`). Falls back to all supported targets if names are unset.
+2. Regenerates config for targets named in the resolved software profile (`lma_paths.py`: LMO sidecar or `computer-profile/software-profile.yaml`; `primary_agent`, `embedded_assistant`, `optional_agents`). Falls back to all supported targets if names are unset.
 3. Writes repo copies under `integrations/IDE-model-management/<app>/`.
 4. Deploys **Continue** to `~/.continue/config.yaml`. **Cline/Roo** stay in-repo — import via the extension UI (no stable global path).
 

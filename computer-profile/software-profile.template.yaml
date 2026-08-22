@@ -1,6 +1,9 @@
 # Software Profile for Local Model Assessment
-# Copy this file to software-profile.yaml and edit to match your environment
+# Standalone: copy to software-profile.yaml and edit.
 #   cp software-profile.template.yaml software-profile.yaml
+# Optional LMO sidecar: LMO may own the live file; LMA consumes it via
+# LMA_SOFTWARE_PROFILE, LMO_ROOT, or integrations/lmo/paths.yaml.
+# See integrations/lmo/lma-lmo-contract.md.
 
 # IDE (mandatory) - The integrated development environment running the model selector
 ide:

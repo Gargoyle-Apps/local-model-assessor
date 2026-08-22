@@ -1,6 +1,6 @@
 # Local Model Assessor
 
-**Version 2.7.1** — bump criteria: [AGENTS.md](AGENTS.md#lma-version).
+**Version 2.8.0** — bump criteria: [AGENTS.md](AGENTS.md#lma-version).
 
 For **tool-calling agents** in IDEs (Cursor, Cline, Continue, …): query SQLite and run repo scripts — not for chat-only LLMs without shell access.
 
@@ -10,7 +10,7 @@ For **tool-calling agents** in IDEs (Cursor, Cline, Continue, …): query SQLite
 
 ## Repo vs Local
 
-Ships **scripts, schema, templates** — empty `model-assessor.db` until you init, profile, assess. **`Brewfile`:** optional `brew bundle` → `libpq` (keg-only; see `brew info libpq`); not needed for Docker stack (`docker compose exec`). **Tracked:** templates under `computer-profile/`, `model-data/` (e.g. `*.template.yaml`, `modelfile/.gitkeep`), `scripts/`, `.skills/` + `.skills-harness/` (skills harness; see [Skills harness](#skills-harness-third-party)), `integrations/` (copy-out: IDE + embed stack + `mcp/scout/.gitkeep`). **Gitignored:** `computer-profile/hardware-profile.yaml`, `computer-profile/software-profile.yaml`, `model-data/*.db` and SQLite sidecars (`*.db-*`), `model-data/assessed-models.md`, `model-data/new-models.yaml`, `model-data/model-lookup.json`, generated modelfiles, `integrations/mcp/scout/*` (scout notes and field guides), local IDE copies (`integrations/IDE-model-management/*/generated/*`, `continue/config.yaml`, `cline/provider-settings.json`, `opencode/opencode.json`, `goose/config.yaml`, `pi/settings.json`, `pi/models.json`, `zed/settings.json`; root `opencode.json` and `opencode.jsonc`), `integrations/embed-retrieval-stack/out/`, `ref/`, `.cursorignore`, `.cursorrules`, `.agents/`, `.continue/`, `.opencode/`, `.venv/`, `.pytest_cache/`. Generated IDE, modelfile, and scout `.gitkeep` placeholders remain tracked. Details: [AGENTS.md](AGENTS.md) + `.gitignore`.
+Ships **scripts, schema, templates** — empty `model-assessor.db` until you init, profile, assess. **`Brewfile`:** optional `brew bundle` → `libpq` (keg-only; see `brew info libpq`); not needed for Docker stack (`docker compose exec`). **Tracked:** templates under `computer-profile/`, `model-data/` (e.g. `*.template.yaml`, `modelfile/.gitkeep`), `scripts/`, `.skills/` + `.skills-harness/` (skills harness; see [Skills harness](#skills-harness-third-party)), `integrations/` (copy-out: IDE + embed stack + `mcp/scout/.gitkeep` + optional LMO contract). **Gitignored:** `computer-profile/hardware-profile.yaml`, `computer-profile/software-profile.yaml`, `model-data/*.db` and SQLite sidecars (`*.db-*`), `model-data/assessed-models.md`, `model-data/new-models.yaml`, `model-data/model-lookup.json`, generated modelfiles, `integrations/mcp/scout/*` (scout notes and field guides), `integrations/lmo/paths.yaml`, local IDE copies (`integrations/IDE-model-management/*/generated/*`, `continue/config.yaml`, `cline/provider-settings.json`, `opencode/opencode.json`, `goose/config.yaml`, `pi/settings.json`, `pi/models.json`, `zed/settings.json`; root `opencode.json` and `opencode.jsonc`), `integrations/embed-retrieval-stack/out/`, `ref/`, `.cursorignore`, `.cursorrules`, `.agents/`, `.continue/`, `.opencode/`, `.venv/`, `.pytest_cache/`. Generated IDE, modelfile, and scout `.gitkeep` placeholders remain tracked. Details: [AGENTS.md](AGENTS.md) + `.gitignore`.
 
 Actual and hypothetical assessments share this boundary: profiles, database contents, installed-model inventories, reports, and machine-specific conclusions stay local. Custom `LMA_DB` files must also be ignored and untracked. Shared procedures and references may use source-backed public facts or clearly labeled synthetic fixtures, with no assumed hardware target. Field guides record target, profile source, and actual/hypothetical/unknown status separately from the executing host; see the [hardware context contract](.skills/_skills/lma-model-field-guide/references/hardware-context.md). They read existing data without editing profiles or databases. `./scripts/query-db.sh --readonly "SQL"` honors `LMA_DB`.
 
@@ -57,6 +57,8 @@ cp -r /path/to/local-model-assessor .model-assessor
 │   ├── sweep-ide-config.py          # Sync is_active, regenerate + deploy IDE configs
 │   ├── generate-stack-handoff.py    # Postgres/pgvector/AGE + embedding handoff
 │   ├── import-profiles.py
+│   ├── lma_paths.py                 # resolve DB + profile paths (optional LMO)
+│   ├── export-lmo-snapshot.py       # zip hardware/software/DB for LMO study
 │   └── query-db.sh
 ├── integrations/                    # copy-out kits: IDE configs + Docker data stack
 │   ├── embed-retrieval-stack/       # Postgres + pgvector + Apache AGE
@@ -74,10 +76,13 @@ cp -r /path/to/local-model-assessor .model-assessor
 │   │   ├── goose/                   # Goose (CLI/Desktop)
 │   │   ├── pi/                      # Pi coding-agent (Terminal)
 │   │   └── zed/                     # Zed (Editor)
-│   └── mcp/
-│       ├── hf-hub-api.md            # REST + MCP hybrid; hf_hub_query gap
-│       ├── huggingface-mcp.md       # HF MCP setup + scout folder
-│       └── scout/                   # local discovery notes (gitignored except .gitkeep)
+│   ├── mcp/
+│   │   ├── hf-hub-api.md            # REST + MCP hybrid; hf_hub_query gap
+│   │   ├── huggingface-mcp.md       # HF MCP setup + scout folder
+│   │   └── scout/                   # local discovery notes (gitignored except .gitkeep)
+│   └── lmo/                         # optional Local Model Orchestrator sidecar
+│       ├── lma-lmo-contract.md      # path-passing contract (LMA-side)
+│       └── paths.template.yaml      # copy to paths.yaml (gitignored) when LMO is cloned
 ├── ref/                             # local agent config copies (gitignored)
 ├── LLM-prompts/
 │   ├── model-assessment-prompt.yaml
@@ -131,6 +136,8 @@ primary_agent:
   name: "Cline"    # your main coding agent
 ```
 
+Hardware and software YAML are optional to author here if [Local Model Orchestrator](https://github.com/Gargoyle-Apps/local-model-orchestrator) (LMO) is cloned locally and owns those files. Point LMA at them with `LMA_HARDWARE_PROFILE` / `LMA_SOFTWARE_PROFILE` or `integrations/lmo/paths.yaml`. See [Optional LMO sidecar](#optional-lmo-sidecar). The model database stays in this repo.
+
 ### 4. Run Initial Model Assessments
 
 Use `LLM-prompts/model-assessment-prompt.yaml` + your hardware profile + Ollama model URLs. Send to `gpt-oss:20b` (or a capable cloud LLM). Save the YAML output to `model-data/new-models.yaml`, then run the [assessment flow](#assess-new-models).
@@ -181,6 +188,7 @@ What model should I use for [vision tasks / creative writing / RAG / etc.]?
 - **IDEs:** [integrations/IDE-model-management/IDE.md](integrations/IDE-model-management/IDE.md) — roles, timeouts, Continue (`~/.continue/config.yaml`) / Cline-Roo (JSON), others; `sweep-ide-config.py` / `generate-ide-config.py`; see [`lma-ide-config`](.skills/_skills/lma-ide-config/SKILL.md) skill.
 - **Postgres + pgvector + AGE:** [integrations/embed-retrieval-stack/embed-retrieval-stack.md](integrations/embed-retrieval-stack/embed-retrieval-stack.md) — pins, compose under `integrations/embed-retrieval-stack/`, use cases, troubleshooting. **Handoff** (`STACK_HANDOFF.md`, `embed_sample.py`): assessed **embedding** in DB → `./scripts/py scripts/generate-stack-handoff.py` → `integrations/embed-retrieval-stack/out/` (gitignored); copy stack + `out/` to your app.
 - **Hugging Face Hub:** [integrations/mcp/hf-hub-api.md](integrations/mcp/hf-hub-api.md) — **REST + MCP hybrid** (`hf-hub-api.py` for lists/collections; MCP for drill-down; **avoid `hf_hub_query`**). MCP setup: [integrations/mcp/huggingface-mcp.md](integrations/mcp/huggingface-mcp.md); scout notes in `integrations/mcp/scout/` (gitignored).
+- **Optional LMO sidecar:** [integrations/lmo/lma-lmo-contract.md](integrations/lmo/lma-lmo-contract.md) — local path passing with Local Model Orchestrator. See [Optional LMO sidecar](#optional-lmo-sidecar).
 
 ---
 
@@ -243,6 +251,27 @@ Models are categorized by VRAM footprint and performance. **Full fields** (budge
 | **Heavy Lifter** | 30-48GB | ~15 t/s | Quality-critical (runs solo) |
 
 **Concurrency:** 1 Utility + 1 Speedster + 1 larger model can run simultaneously. Heavy Lifters cannot co-run.
+
+---
+
+## Optional LMO sidecar
+
+[Local Model Orchestrator (LMO)](https://github.com/Gargoyle-Apps/local-model-orchestrator) can own **hardware** and **software** inventory when both repos are cloned on the same machine. LMA still owns **`model-assessor.db`**. Neither repo is required for the other to run.
+
+Live sharing is **absolute local paths** (environment variables or gitignored `integrations/lmo/paths.yaml`), not file copies. Resolve and inspect:
+
+```bash
+./scripts/py scripts/lma_paths.py
+./scripts/py scripts/lma_paths.py --format json
+```
+
+Pack a study zip of the current hardware YAML, software YAML, and model DB (writes gitignored `ref/lma-lmo-snapshot.zip`):
+
+```bash
+./scripts/py scripts/export-lmo-snapshot.py
+```
+
+Full contract: [integrations/lmo/lma-lmo-contract.md](integrations/lmo/lma-lmo-contract.md). Agent workflow: [`lma-lmo-sidecar`](.skills/_skills/lma-lmo-sidecar/SKILL.md).
 
 ---
 

@@ -1,0 +1,18 @@
+{
+  "schema_version": "1.0",
+  "skill": "lma-lmo-sidecar",
+  "should_trigger": [
+    "Link this repo to the local LMO clone via absolute paths.",
+    "Export a zip of hardware, software, and the model DB for Local Model Orchestra.",
+    "Point LMA at LMO hardware and software profiles.",
+    "Set up the optional Local Model Orchestrator sidecar.",
+    "Where should LMO read model-assessor.db from?"
+  ],
+  "should_not_trigger": [
+    "Assess this new Ollama model and import it.",
+    "Which model should I use for coding?",
+    "Generate Continue config from provisioned models.",
+    "Initialize the database and migrate schema.",
+    "Evaluate this GPU SKU for local LLMs."
+  ]
+}

@@ -69,6 +69,7 @@ integrations/embed-retrieval-stack/out/
 
 integrations/mcp/scout/*
 !integrations/mcp/scout/.gitkeep
+integrations/lmo/paths.yaml
 
 opencode.json
 opencode.jsonc

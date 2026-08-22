@@ -1,6 +1,9 @@
 # Hardware Profile for Local Model Assessment
-# Copy this file to hardware-profile.yaml and edit to match your system
+# Standalone: copy to hardware-profile.yaml and edit.
 #   cp hardware-profile.template.yaml hardware-profile.yaml
+# Optional LMO sidecar: LMO may own the live file; LMA consumes it via
+# LMA_HARDWARE_PROFILE, LMO_ROOT, or integrations/lmo/paths.yaml.
+# See integrations/lmo/lma-lmo-contract.md.
 
 system:
   name: "Your Machine Name"

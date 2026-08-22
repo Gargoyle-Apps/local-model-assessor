@@ -37,8 +37,12 @@ except ImportError:
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 DEFAULT_DB = REPO_ROOT / "model-data" / "model-assessor.db"
-SOFTWARE = REPO_ROOT / "computer-profile" / "software-profile.yaml"
-SOFTWARE_TEMPLATE = REPO_ROOT / "computer-profile" / "software-profile.template.yaml"
+
+_SCRIPTS = Path(__file__).resolve().parent
+if str(_SCRIPTS) not in sys.path:
+    sys.path.insert(0, str(_SCRIPTS))
+
+import lma_paths  # noqa: E402
 
 SUPPORTED_TARGETS = ("continue", "cline")
 
@@ -61,8 +65,13 @@ def _load_generate_module():
 
 
 def _read_software_profile() -> dict:
-    src = SOFTWARE if SOFTWARE.exists() else SOFTWARE_TEMPLATE
-    if not src.exists():
+    try:
+        resolved = lma_paths.software_profile_path()
+    except lma_paths.PathResolutionError as exc:
+        print(f"Warning: {exc}; using all targets.", file=sys.stderr)
+        return {}
+    src = resolved.path
+    if src is None or not src.exists():
         return {}
     try:
         return yaml.safe_load(src.read_text(encoding="utf-8")) or {}

@@ -20,15 +20,17 @@ content: |
   ./scripts/bootstrap-python.sh
   # Create DB and profiles (if missing)
   [ -f model-data/model-assessor.db ] || ./scripts/init-db.sh
+  ./scripts/py scripts/lma_paths.py
+  # Standalone only: if hardware/software source is missing or template and LMO is not linked:
   [ -f computer-profile/hardware-profile.yaml ] || cp computer-profile/hardware-profile.template.yaml computer-profile/hardware-profile.yaml
   [ -f computer-profile/software-profile.yaml ] || cp computer-profile/software-profile.template.yaml computer-profile/software-profile.yaml
-  # Import profiles into DB
+  # Import resolved profiles into DB
   ./scripts/py scripts/import-profiles.py
   ```
   If migrating from a legacy model-lookup.json, convert it to YAML and run `./scripts/py scripts/add-model-from-yaml.py model-data/new-models.yaml`.
 
   **HARDWARE CONTEXT:**
-  Refer to the provided computer-profile/hardware-profile.yaml for:
+  Resolve the live hardware YAML with `./scripts/py scripts/lma_paths.py` (LMO sidecar path when linked, else `computer-profile/hardware-profile.yaml`). Refer to that file for:
   - System specifications (CPU, GPU, RAM)
   - VRAM budget and constraints (`total_available`, `os_headroom_gb`, `concurrency_reserve`, `kv_cache_estimate`)
   - Quantization preferences

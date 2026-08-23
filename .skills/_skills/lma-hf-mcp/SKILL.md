@@ -13,7 +13,7 @@ triggers:
   - hf collections
   - mlx-community collections
 dependencies: []
-version: "1.3.2"
+version: "1.3.3"
 ---
 
 # LMA Hugging Face MCP + Hub REST API
@@ -91,6 +91,8 @@ After REST shortlist + MCP drill-down on **local-runnable** candidates:
 | MLX safetensors (`mlx-community/…`) | `lma-mlx-lm` |
 
 Run `./scripts/py scripts/lma_paths.py` and gate on the resolved hardware profile's VRAM budget before assess. MCP does not replace live benchmarks.
+
+If the user explicitly requests discovery against mock inventory, run `./scripts/py scripts/lma_paths.py --allow-mock --format json`, confirm `hardware_profile.mock` is true, and label shortlist fit as simulated. Do not turn mock fit into an install or measured-performance claim.
 
 **Scout notes:** `integrations/mcp/scout/` — log REST totals, MCP repo picks, VRAM fit. Example: `scout/mlx-community-collections.md`.
 

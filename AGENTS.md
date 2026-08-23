@@ -8,7 +8,7 @@
 
 ### LMA version
 
-**`2.8.0`** — bump **MAJOR** for breaking paths, agent-facing contracts, or DB/schema expectations without a clear migration; **MINOR** for additive capability (e.g. new runtime, integration, or skills surface); **PATCH** for fixes and docs-only; keep **README.md** and this heading in sync; prefer non-`x.y.0` patch on intentional release lines.
+**`2.9.0`** — bump **MAJOR** for breaking paths, agent-facing contracts, or DB/schema expectations without a clear migration; **MINOR** for additive capability (e.g. new runtime, integration, or skills surface); **PATCH** for fixes and docs-only; keep **README.md** and this heading in sync; prefer non-`x.y.0` patch on intentional release lines.
 
 ---
 
@@ -26,7 +26,7 @@ This repository uses **Path B** from the bundled skills harness: **portable skil
 
 - **Python:** Always run scripts via `./scripts/py scripts/<name>.py …` from the repo root. See `lma-python-env` skill for venv details.
 - **DB path:** `LMA_DB` env var overrides the DB path for every consumer. Without it, `LMA_ROOT` relocates the default `model-data/model-assessor.db` for Python scripts, `migrate-schema.sh`, `query-db.sh`, and `init-db.sh`. Explanatory workflows use `query-db.sh --readonly "SQL"` and do not initialize or migrate missing data.
-- **Optional LMO sidecar:** LMA works alone. When [Local Model Orchestrator](https://github.com/Gargoyle-Apps/local-model-orchestrator) is cloned locally, share **absolute paths** (env or gitignored `integrations/lmo/paths.yaml`). LMO may own hardware/software YAML; LMA always owns the model DB. Resolve with `./scripts/py scripts/lma_paths.py`. Contract: [integrations/lmo/lma-lmo-contract.md](integrations/lmo/lma-lmo-contract.md). Skill: `lma-lmo-sidecar`.
+- **Optional LMO sidecar:** LMA works alone. When [Local Model Orchestrator](https://github.com/Gargoyle-Apps/local-model-orchestrator) is cloned locally, share **absolute paths** (env or gitignored `integrations/lmo/paths.yaml`). LMO may own hardware/software YAML; LMA always owns the model DB. Resolve with `./scripts/py scripts/lma_paths.py`. Mock/dry-run profiles are rejected unless the operator explicitly passes `--allow-mock` or sets `LMA_ALLOW_MOCK=1`; keep them untracked and label all derived results simulated. Contract: [integrations/lmo/lma-lmo-contract.md](integrations/lmo/lma-lmo-contract.md). Skill: `lma-lmo-sidecar`.
 - **Queries:** `./scripts/query-db.sh "SQL"` — always pass SQL as a quoted string argument.
 - **If DB missing:** `./scripts/init-db.sh`. **If columns/tables missing:** `./scripts/migrate-schema.sh`.
 - **Tests:** `./scripts/py -m pytest tests/ -v` from repo root. Add tests for new helpers and ingestion paths. Dev deps: `pip install -r requirements-dev.txt`.
@@ -62,6 +62,7 @@ Resolve the live hardware YAML first (LMO sidecar or local file):
 ```
 
 Then read `vram_budget` from the printed `hardware_profile` path (standalone default: `computer-profile/hardware-profile.yaml`).
+For an explicitly requested simulation, rerun with `--allow-mock`; never describe its budget as the current host.
 
 Effective budget ≈ `total_available - os_headroom_gb`.
 

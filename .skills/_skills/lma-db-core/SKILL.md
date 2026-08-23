@@ -13,7 +13,7 @@ triggers:
   - data flow
   - key queries
 dependencies: []
-version: "1.2.0"
+version: "1.2.1"
 ---
 
 # LMA Database Core
@@ -78,8 +78,8 @@ For explanatory workflows, use `./scripts/query-db.sh --readonly "SQL"`. Missing
 ### 6. Architecture one-liners
 
 - **Scripts (flags):** `query-db.sh "SQL"` — always pass SQL string. `init-db.sh` / `migrate-schema.sh` — empty DB / schema migrations.
-- **Python:** `./scripts/py scripts/<name>.py` (see `lma-python-env` skill). `add-model-from-yaml.py` — provenance via args or env. `export-assessed-models.py [path]`. `import-profiles.py [db]`. `generate-ide-config.py --target continue|cline [--active-only] [--dry-run]`. `sweep-ide-config.py` — run after model add/remove or clone create (see `lma-ide-config` skill). `generate-stack-handoff.py [--output-dir DIR]`.
-- **Env:** `LMA_DB` overrides the DB path for every consumer. Without it, `LMA_ROOT` relocates the default DB for Python scripts and DB shell wrappers. `LMA_HARDWARE_PROFILE`, `LMA_SOFTWARE_PROFILE`, and `LMO_ROOT` are optional LMO sidecar overrides.
+- **Python:** `./scripts/py scripts/<name>.py` (see `lma-python-env` skill). `add-model-from-yaml.py` — provenance via args or env. `export-assessed-models.py [path]`. `import-profiles.py [db] [--allow-mock]`. `generate-ide-config.py --target continue|cline [--active-only] [--dry-run]`. `sweep-ide-config.py` — run after model add/remove or clone create (see `lma-ide-config` skill). `generate-stack-handoff.py [--output-dir DIR]`.
+- **Env:** `LMA_DB` overrides the DB path for every consumer. Without it, `LMA_ROOT` relocates the default DB for Python scripts and DB shell wrappers. `LMA_HARDWARE_PROFILE`, `LMA_SOFTWARE_PROFILE`, and `LMO_ROOT` are optional LMO sidecar overrides. `LMA_ALLOW_MOCK=1` is an explicit per-process opt-in for mock/dry-run profiles; do not set it globally.
 
 ### 7. Hardware budget and co-run rule
 

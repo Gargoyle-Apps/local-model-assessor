@@ -23,7 +23,7 @@ dependencies:
   - lma-python-env
   - lma-db-core
   - lma-ide-config
-version: "1.3.1"
+version: "1.3.2"
 ---
 
 # LMA Assess & Import Model
@@ -59,6 +59,8 @@ Read `LLM-prompts/model-assessment-prompt.yaml` for the full assessment rubric. 
 - Provisioning config — per-role Modelfile overrides (context, temperature, system prompt).
 
 Run `./scripts/py scripts/lma_paths.py`, read the resolved `hardware_profile` path, and gate all assessments on that file — especially `vram_budget`, `context_strategy`, and heavy-lifter / co-run rules. Do not assume full advertised context from the upstream card.
+
+Mock hardware is rejected by default. Only when the user explicitly asks to assess against simulated inventory, rerun `./scripts/py scripts/lma_paths.py --allow-mock --format json`, confirm `hardware_profile.mock` is true, and label the assessment simulated. A mock budget supports fit planning only: do not claim the host can run the model, install or benchmark on that basis, or report estimated `tps` as measured.
 
 ### 3. Write assessment YAML
 

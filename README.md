@@ -1,6 +1,6 @@
 # Local Model Assessor
 
-**Version 2.8.0** — bump criteria: [AGENTS.md](AGENTS.md#lma-version).
+**Version 2.9.0** — bump criteria: [AGENTS.md](AGENTS.md#lma-version).
 
 For **tool-calling agents** in IDEs (Cursor, Cline, Continue, …): query SQLite and run repo scripts — not for chat-only LLMs without shell access.
 
@@ -264,6 +264,21 @@ Live sharing is **absolute local paths** (environment variables or gitignored `i
 ./scripts/py scripts/lma_paths.py
 ./scripts/py scripts/lma_paths.py --format json
 ```
+
+Mock inventory is an explicit planning mode. Mark it with `profile.mode: dry_run`,
+`profile.mock: true`, or `profile.physical_hardware_present: false`, keep the YAML
+untracked, and opt in for that operation:
+
+```bash
+./scripts/py scripts/lma_paths.py --allow-mock --format json
+./scripts/py scripts/import-profiles.py --allow-mock
+./scripts/py scripts/export-lmo-snapshot.py --allow-mock
+```
+
+Without `--allow-mock` (or `LMA_ALLOW_MOCK=1` for scripts that consume profiles),
+resolution stops instead of silently treating simulated capacity as the current
+machine. The resolver reports `mock` and `profile_mode`; label every derived
+assessment or recommendation as simulated.
 
 Pack a local study zip of the current hardware YAML, software YAML, and model DB (writes gitignored `ref/lma-lmo-snapshot.zip`):
 

@@ -5,6 +5,7 @@ Writes ref/lma-lmo-snapshot.zip (gitignored) unless --output is set.
 Does not require LMO. Run from repo root:
 
   ./scripts/py scripts/export-lmo-snapshot.py
+  ./scripts/py scripts/export-lmo-snapshot.py --allow-mock
 """
 
 from __future__ import annotations
@@ -18,6 +19,7 @@ import tempfile
 import zipfile
 from datetime import datetime, timezone
 from pathlib import Path
+from typing import Optional
 
 _SCRIPTS = Path(__file__).resolve().parent
 if str(_SCRIPTS) not in sys.path:
@@ -80,6 +82,7 @@ LMA git: {git_head}
 LMA root: {info['lma_root']}
 LMO root: {info['lmo_root'] or '(not linked)'}
 Linked: {info['linked']}
+Mock profiles allowed: {info['allow_mock']}
 
 This zip is a **study pack**, not a live link. Production sharing uses absolute
 local paths between two clones (see integrations/lmo/lma-lmo-contract.md).
@@ -90,8 +93,8 @@ machine; do not upload it to GitHub or send it to an external service.
 
 | Artifact | Owner | This snapshot |
 |----------|-------|---------------|
-| hardware-profile.yaml | LMO when linked; else LMA local | hardware-profile.yaml (source={info['hardware_profile']['source']}) |
-| software-profile.yaml | LMO when linked; else LMA local | software-profile.yaml (source={info['software_profile']['source']}) |
+| hardware-profile.yaml | LMO when linked; else LMA local | hardware-profile.yaml (source={info['hardware_profile']['source']}, mock={info['hardware_profile']['mock']}) |
+| software-profile.yaml | LMO when linked; else LMA local | software-profile.yaml (source={info['software_profile']['source']}, mock={info['software_profile']['mock']}) |
 | model-assessor.db | LMA | model-assessor.db (source={info['db']['source']}) |
 | schema.sql | LMA (tracked) | schema.sql |
 
@@ -116,11 +119,11 @@ Do not copy these files across repos as the source of truth. Point at them.
 """
 
 
-def export_snapshot(output: Path) -> Path:
-    info = lma_paths.describe()
+def export_snapshot(output: Path, *, allow_mock: Optional[bool] = None) -> Path:
+    info = lma_paths.describe(allow_mock=allow_mock)
     db = lma_paths.db_path()
-    hw = lma_paths.hardware_profile_path()
-    sw = lma_paths.software_profile_path()
+    hw = lma_paths.hardware_profile_path(allow_mock=allow_mock)
+    sw = lma_paths.software_profile_path(allow_mock=allow_mock)
     root = lma_paths.lma_root()
 
     if db.source == "missing" or db.path is None or not db.path.is_file():
@@ -173,7 +176,15 @@ def export_snapshot(output: Path) -> Path:
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Export hardware, software, and model DB for LMO")
+    parser = argparse.ArgumentParser(
+        description="Export hardware, software, and model DB for LMO"
+    )
+    parser.add_argument(
+        "--allow-mock",
+        action="store_true",
+        default=None,
+        help="allow profiles explicitly marked as mock/dry-run inventory",
+    )
     parser.add_argument(
         "--output",
         type=Path,
@@ -185,7 +196,7 @@ def main() -> int:
     if out is None:
         out = lma_paths.lma_root() / "ref" / "lma-lmo-snapshot.zip"
     try:
-        written = export_snapshot(out)
+        written = export_snapshot(out, allow_mock=args.allow_mock)
     except lma_paths.PathResolutionError as exc:
         print(f"Error: {exc}", file=sys.stderr)
         return 1

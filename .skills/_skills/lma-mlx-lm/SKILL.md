@@ -11,7 +11,7 @@ triggers:
   - safetensors model
 dependencies:
   - lma-assess-import-model
-version: "1.2.1"
+version: "1.2.2"
 ---
 
 # LMA MLX LM
@@ -46,6 +46,8 @@ Skip if user already named a repo ID.
 ### 1. Pre-flight: hardware check
 
 Run `./scripts/py scripts/lma_paths.py`, read the resolved `hardware_profile` path, and confirm the model's weight size fits its unified memory budget. MLX models load entirely into unified memory — the effective budget is the same VRAM concept used for Ollama models.
+
+Only for an explicitly requested simulated fit check, run `./scripts/py scripts/lma_paths.py --allow-mock --format json`. Confirm `hardware_profile.mock` is true, label the result simulated, and stop before download, installation, serving, benchmarking, or import unless the user's request includes those actions with mock inventory.
 
 For quantized models, rough size estimates:
 - **4-bit**: ~0.5 GB per billion parameters

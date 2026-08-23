@@ -12,12 +12,14 @@ content: |
   > **Cloud models are excluded.** Never recommend models that exist only as cloud/API proxies (e.g. Ollama `model:cloud` tags). Only locally-runnable weights qualify. If a user asks about a cloud-only model, inform them and suggest checking [Hugging Face](https://huggingface.co) for a local alternative.
 
   **HARDWARE CONTEXT:**
-  Read `computer-profile/hardware-profile.yaml` (or query `SELECT yaml_content FROM hardware_profile` from the DB) for:
+  Run `./scripts/py scripts/lma_paths.py --format json` and read its resolved `hardware_profile` for:
   - System specifications and VRAM limits
   - `vram_budget.os_headroom_gb` and effective budget (`total_available` minus OS headroom)
   - Concurrency rules (which models can co-run)
   - Hardware class definitions with VRAM ranges and expected t/s
   - Context window strategies
+
+  Mock/dry-run profiles are rejected by default. Only when the user explicitly requests a simulated recommendation, rerun with `--allow-mock`, confirm `hardware_profile.mock` is `true`, and label the recommendation simulated. Do not install a model or claim compatibility with the current host on that basis. If reading an imported DB snapshot instead, inspect its YAML `profile` mapping for the same mock markers before using it.
 
   **CREATIVE QUALITY TIERS:**
   For writing and creative tasks, consider the draft stage:

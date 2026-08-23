@@ -6,6 +6,8 @@
 #
 # Env vars override this file:
 #   LMO_ROOT, LMA_HARDWARE_PROFILE, LMA_SOFTWARE_PROFILE, LMA_DB, LMA_ROOT
+# Mock authorization is deliberately not stored here; use --allow-mock or
+# LMA_ALLOW_MOCK=1 for the specific planning operation.
 #
 # Relative hardware_profile / software_profile paths are resolved against lmo_root.
 

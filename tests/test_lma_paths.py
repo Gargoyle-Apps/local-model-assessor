@@ -42,6 +42,7 @@ def isolated_roots(tmp_path, monkeypatch):
     monkeypatch.delenv("LMA_HARDWARE_PROFILE", raising=False)
     monkeypatch.delenv("LMA_SOFTWARE_PROFILE", raising=False)
     monkeypatch.delenv("LMO_ROOT", raising=False)
+    monkeypatch.delenv("LMA_ALLOW_MOCK", raising=False)
     return lma, lmo
 
 
@@ -127,6 +128,70 @@ class TestHardwareSoftwareResolution:
         assert resolved.source == "local"
 
 
+class TestMockProfiles:
+    @staticmethod
+    def _mock_profile(path: Path) -> Path:
+        return _write(
+            path,
+            "profile:\n"
+            "  mode: dry_run\n"
+            "  physical_hardware_present: false\n"
+            "system:\n"
+            "  name: simulated target\n",
+        )
+
+    def test_mock_profile_requires_explicit_opt_in(self, isolated_roots, monkeypatch):
+        _, lmo = isolated_roots
+        mock = self._mock_profile(lmo / "inventory" / "hardware-profile.yaml")
+        monkeypatch.setenv("LMO_ROOT", str(lmo))
+
+        with pytest.raises(lma_paths.PathResolutionError, match="mock profile requires"):
+            lma_paths.hardware_profile_path()
+
+        resolved = lma_paths.hardware_profile_path(allow_mock=True)
+        assert resolved.path == mock.resolve()
+        assert resolved.mock is True
+        assert resolved.profile_mode == "dry_run"
+
+    @pytest.mark.parametrize(
+        "marker",
+        (
+            "mode: mock",
+            "mode: dry-run",
+            "mode: simulated",
+            "mock: true",
+            "physical_hardware_present: false",
+        ),
+    )
+    def test_supported_mock_markers(self, isolated_roots, monkeypatch, marker):
+        _, lmo = isolated_roots
+        _write(
+            lmo / "inventory" / "hardware-profile.yaml",
+            f"profile:\n  {marker}\nsystem:\n  name: simulated target\n",
+        )
+        monkeypatch.setenv("LMO_ROOT", str(lmo))
+
+        assert lma_paths.hardware_profile_path(allow_mock=True).mock is True
+
+    def test_env_opt_in_and_describe_metadata(self, isolated_roots, monkeypatch):
+        lma, lmo = isolated_roots
+        self._mock_profile(lmo / "inventory" / "hardware-profile.yaml")
+        _write(lma / "computer-profile" / "software-profile.template.yaml", "template: true\n")
+        monkeypatch.setenv("LMO_ROOT", str(lmo))
+        monkeypatch.setenv("LMA_ALLOW_MOCK", "yes")
+
+        info = lma_paths.describe()
+
+        assert info["allow_mock"] is True
+        assert info["hardware_profile"]["mock"] is True
+        assert info["hardware_profile"]["profile_mode"] == "dry_run"
+
+    def test_invalid_env_opt_in_is_rejected(self, isolated_roots, monkeypatch):
+        monkeypatch.setenv("LMA_ALLOW_MOCK", "sometimes")
+        with pytest.raises(lma_paths.PathResolutionError, match="LMA_ALLOW_MOCK must be"):
+            lma_paths.describe()
+
+
 class TestDbPath:
     def test_lma_db_env(self, isolated_roots, monkeypatch, tmp_path):
         db = tmp_path / "custom.db"
@@ -156,6 +221,7 @@ def test_print_env_shell_quotes_paths(capsys):
     info = {
         "lma_root": "/tmp/LMA Root",
         "lmo_root": "/tmp/LMO Root",
+        "allow_mock": True,
         "db": {"path": "/tmp/LMA Root/model-data/model-assessor.db"},
         "hardware_profile": {"path": "/tmp/LMO Root/inventory/hardware.yaml"},
         "software_profile": {"path": "/tmp/LMO Root/inventory/software.yaml"},
@@ -171,6 +237,7 @@ def test_print_env_shell_quotes_paths(capsys):
         parsed[name] = value
     assert parsed["LMA_ROOT"] == "/tmp/LMA Root"
     assert parsed["LMO_ROOT"] == "/tmp/LMO Root"
+    assert parsed["LMA_ALLOW_MOCK"] == "1"
     assert parsed["LMA_DB"] == "/tmp/LMA Root/model-data/model-assessor.db"
 
 

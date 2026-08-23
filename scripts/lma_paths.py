@@ -14,11 +14,14 @@ Resolution order per artifact (first hit wins):
 
 LMA_ROOT overrides the LMA clone root (default: parent of scripts/).
 LMO_ROOT is the LMO clone root. It does not change LMA ownership of the model DB.
+Profiles declaring mock/dry-run inventory require --allow-mock or
+LMA_ALLOW_MOCK=1. Resolved output preserves their mock status.
 
 CLI (from repo root):
   ./scripts/py scripts/lma_paths.py
   ./scripts/py scripts/lma_paths.py --format json
   ./scripts/py scripts/lma_paths.py --format env
+  ./scripts/py scripts/lma_paths.py --allow-mock --format json
 """
 
 from __future__ import annotations
@@ -46,6 +49,8 @@ LINK_RELATIVE = Path("integrations") / "lmo" / "paths.yaml"
 class ResolvedPath:
     path: Optional[Path]
     source: str  # env | lmo-link | lmo-root | local | template | missing
+    mock: bool = False
+    profile_mode: Optional[str] = None
 
     def as_str(self) -> str:
         return str(self.path) if self.path is not None else ""
@@ -53,6 +58,28 @@ class ResolvedPath:
 
 class PathResolutionError(FileNotFoundError):
     """An explicit override was set but the file is missing."""
+
+
+_TRUE_VALUES = {"1", "true", "yes", "on"}
+_FALSE_VALUES = {"0", "false", "no", "off"}
+_MOCK_MODES = {"dry_run", "dry-run", "mock", "simulated"}
+
+
+def mock_profiles_allowed(explicit: Optional[bool] = None) -> bool:
+    """Return whether mock profiles may be consumed for this operation."""
+    if explicit is not None:
+        return explicit
+    raw = os.environ.get("LMA_ALLOW_MOCK")
+    if raw is None:
+        return False
+    normalized = raw.strip().lower()
+    if normalized in _TRUE_VALUES:
+        return True
+    if normalized in _FALSE_VALUES:
+        return False
+    raise PathResolutionError(
+        "LMA_ALLOW_MOCK must be one of: 1, true, yes, on, 0, false, no, off"
+    )
 
 
 def lma_root() -> Path:
@@ -110,6 +137,41 @@ def _existing_file(path: Path) -> Optional[Path]:
     return path if path.is_file() else None
 
 
+def _resolved_profile(
+    path: Path, source: str, *, allow_mock: Optional[bool]
+) -> ResolvedPath:
+    """Annotate a profile and require explicit opt-in for simulated inventory."""
+    mode: Optional[str] = None
+    is_mock = False
+    if yaml is None:
+        raise PathResolutionError(
+            "PyYAML is required to inspect profiles. Run ./scripts/bootstrap-python.sh"
+        )
+    try:
+        data = yaml.safe_load(path.read_text(encoding="utf-8"))
+    except (OSError, yaml.YAMLError) as exc:
+        raise PathResolutionError(f"could not read profile {path}: {exc}") from exc
+
+    if isinstance(data, dict) and isinstance(data.get("profile"), dict):
+        profile = data["profile"]
+        raw_mode = profile.get("mode")
+        if raw_mode is not None:
+            mode = str(raw_mode)
+        is_mock = (
+            profile.get("mock") is True
+            or (mode is not None and mode.lower() in _MOCK_MODES)
+            or profile.get("physical_hardware_present") is False
+        )
+
+    if is_mock and not mock_profiles_allowed(allow_mock):
+        raise PathResolutionError(
+            f"mock profile requires explicit opt-in: {path}. "
+            "Pass --allow-mock to lma_paths.py or set LMA_ALLOW_MOCK=1 "
+            "for commands that consume profiles."
+        )
+    return ResolvedPath(path, source, mock=is_mock, profile_mode=mode)
+
+
 def db_path() -> ResolvedPath:
     raw = os.environ.get("LMA_DB")
     if raw:
@@ -141,13 +203,14 @@ def _profile(
     conventional: Path,
     local_name: str,
     template_name: str,
+    allow_mock: Optional[bool],
 ) -> ResolvedPath:
     raw = os.environ.get(env_name)
     if raw:
         p = Path(raw).expanduser().resolve()
         if not p.is_file():
             raise PathResolutionError(f"{env_name} is set but not a file: {p}")
-        return ResolvedPath(p, "env")
+        return _resolved_profile(p, "env", allow_mock=allow_mock)
 
     link = _load_link()
     if link.get(link_key):
@@ -161,50 +224,53 @@ def _profile(
             raise PathResolutionError(
                 f"integrations/lmo/paths.yaml {link_key} is set but not a file: {declared}"
             )
-        return ResolvedPath(declared, "lmo-link")
+        return _resolved_profile(declared, "lmo-link", allow_mock=allow_mock)
 
     root = lmo_root()
     if root:
         candidate = _existing_file(root / conventional)
         if candidate:
-            return ResolvedPath(candidate, "lmo-root")
+            return _resolved_profile(candidate, "lmo-root", allow_mock=allow_mock)
 
     local = lma_root() / "computer-profile" / local_name
     found = _existing_file(local)
     if found:
-        return ResolvedPath(found, "local")
+        return _resolved_profile(found, "local", allow_mock=allow_mock)
 
     template = lma_root() / "computer-profile" / template_name
     found = _existing_file(template)
     if found:
-        return ResolvedPath(found, "template")
+        return _resolved_profile(found, "template", allow_mock=allow_mock)
 
     return ResolvedPath(None, "missing")
 
 
-def hardware_profile_path() -> ResolvedPath:
+def hardware_profile_path(*, allow_mock: Optional[bool] = None) -> ResolvedPath:
     return _profile(
         env_name="LMA_HARDWARE_PROFILE",
         link_key="hardware_profile",
         conventional=LMO_HARDWARE_RELATIVE,
         local_name="hardware-profile.yaml",
         template_name="hardware-profile.template.yaml",
+        allow_mock=allow_mock,
     )
 
 
-def software_profile_path() -> ResolvedPath:
+def software_profile_path(*, allow_mock: Optional[bool] = None) -> ResolvedPath:
     return _profile(
         env_name="LMA_SOFTWARE_PROFILE",
         link_key="software_profile",
         conventional=LMO_SOFTWARE_RELATIVE,
         local_name="software-profile.yaml",
         template_name="software-profile.template.yaml",
+        allow_mock=allow_mock,
     )
 
 
-def describe() -> dict:
-    hw = hardware_profile_path()
-    sw = software_profile_path()
+def describe(*, allow_mock: Optional[bool] = None) -> dict:
+    allowed = mock_profiles_allowed(allow_mock)
+    hw = hardware_profile_path(allow_mock=allowed)
+    sw = software_profile_path(allow_mock=allowed)
     db = db_path()
     root = lmo_root()
     linked = hw.source in {"env", "lmo-link", "lmo-root"} or sw.source in {
@@ -216,9 +282,20 @@ def describe() -> dict:
         "lma_root": str(lma_root()),
         "lmo_root": str(root) if root else None,
         "linked": linked,
+        "allow_mock": allowed,
         "db": {"path": db.as_str(), "source": db.source},
-        "hardware_profile": {"path": hw.as_str(), "source": hw.source},
-        "software_profile": {"path": sw.as_str(), "source": sw.source},
+        "hardware_profile": {
+            "path": hw.as_str(),
+            "source": hw.source,
+            "mock": hw.mock,
+            "profile_mode": hw.profile_mode,
+        },
+        "software_profile": {
+            "path": sw.as_str(),
+            "source": sw.source,
+            "mock": sw.mock,
+            "profile_mode": sw.profile_mode,
+        },
     }
 
 
@@ -226,9 +303,12 @@ def _print_text(info: dict) -> None:
     print(f"lma_root\t{info['lma_root']}")
     print(f"lmo_root\t{info['lmo_root'] or ''}")
     print(f"linked\t{str(info['linked']).lower()}")
+    print(f"allow_mock\t{str(info['allow_mock']).lower()}")
     for key in ("db", "hardware_profile", "software_profile"):
         block = info[key]
         print(f"{key}\t{block['path']}\t{block['source']}")
+        if key != "db":
+            print(f"{key}_mock\t{str(block['mock']).lower()}")
 
 
 def _print_env(info: dict) -> None:
@@ -238,6 +318,8 @@ def _print_env(info: dict) -> None:
     assignment("LMA_ROOT", info["lma_root"])
     if info["lmo_root"]:
         assignment("LMO_ROOT", info["lmo_root"])
+    if info["allow_mock"]:
+        assignment("LMA_ALLOW_MOCK", "1")
     if info["db"]["path"]:
         assignment("LMA_DB", info["db"]["path"])
     if info["hardware_profile"]["path"]:
@@ -249,6 +331,12 @@ def _print_env(info: dict) -> None:
 def main() -> int:
     parser = argparse.ArgumentParser(description="Print resolved LMA/LMO artifact paths")
     parser.add_argument(
+        "--allow-mock",
+        action="store_true",
+        default=None,
+        help="allow profiles explicitly marked as mock/dry-run inventory",
+    )
+    parser.add_argument(
         "--format",
         choices=("text", "json", "env"),
         default="text",
@@ -256,7 +344,7 @@ def main() -> int:
     )
     args = parser.parse_args()
     try:
-        info = describe()
+        info = describe(allow_mock=args.allow_mock)
     except PathResolutionError as exc:
         print(f"Error: {exc}", file=sys.stderr)
         return 1

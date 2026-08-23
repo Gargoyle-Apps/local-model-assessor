@@ -41,6 +41,7 @@ not treat a zip snapshot as live state.
 | `LMA_DB` | operator / LMO | LMA, LMO | Absolute path to `model-assessor.db` |
 | `LMA_HARDWARE_PROFILE` | operator / LMO | LMA | Absolute path to hardware YAML |
 | `LMA_SOFTWARE_PROFILE` | operator / LMO | LMA | Absolute path to software YAML |
+| `LMA_ALLOW_MOCK` | operator | LMA | Explicit per-process opt-in (`1`, `true`, `yes`, or `on`) for mock/dry-run profiles |
 
 Explicit env paths must exist; a missing override is an error (misconfigured
 link), not a silent fallback.
@@ -65,6 +66,30 @@ Until LMO publishes its own layout, LMA looks under `LMO_ROOT` for:
 
 If those files are absent, LMA keeps using its local `computer-profile/` files
 or templates. Linking is opportunistic, not required.
+
+### Mock inventory (explicit opt-in)
+
+LMO may publish an untracked planning profile when physical hardware is not
+present. Declare it under the additive top-level `profile` mapping with at least
+one of:
+
+```yaml
+profile:
+  mode: dry_run
+  mock: true
+  physical_hardware_present: false
+```
+
+LMA treats `mode: dry_run|dry-run|mock|simulated`, `mock: true`, or
+`physical_hardware_present: false` as mock inventory. Resolution rejects such a
+profile by default. The operator must pass `--allow-mock` to supported commands
+or set `LMA_ALLOW_MOCK=1` for the consuming process. Resolved JSON exposes
+`allow_mock`, `mock`, and `profile_mode` so agents can preserve the distinction.
+
+Mock profiles must remain gitignored/untracked in their owner repo. They are for
+planning, assessment, import, or snapshot exercises only: label derived results
+as simulated, do not claim they describe the host, and do not present estimated
+throughput as a measured benchmark.
 
 ## Explicit non-goals
 
@@ -101,6 +126,7 @@ orchestration: `models`, `role_model`, `constraint_model`, `provisioned_models`,
 ./scripts/py scripts/lma_paths.py
 ./scripts/py scripts/lma_paths.py --format json
 ./scripts/py scripts/lma_paths.py --format env
+./scripts/py scripts/lma_paths.py --allow-mock --format json
 ```
 
 Resolution order: env → `integrations/lmo/paths.yaml` → `LMO_ROOT` conventional
@@ -110,6 +136,8 @@ files → LMA local YAML/DB → templates (hardware/software only).
 
 ```bash
 ./scripts/py scripts/export-lmo-snapshot.py
+# Explicitly include mock inventory:
+./scripts/py scripts/export-lmo-snapshot.py --allow-mock
 ```
 
 Writes gitignored `ref/lma-lmo-snapshot.zip` (hardware YAML, software YAML,

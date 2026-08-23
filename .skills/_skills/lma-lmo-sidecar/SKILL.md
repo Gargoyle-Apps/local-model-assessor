@@ -10,10 +10,12 @@ triggers:
   - export LMO snapshot
   - hardware from LMO
   - pass local paths to LMO
+  - mock hardware profile
+  - dry-run profile
 dependencies:
   - lma-python-env
   - lma-db-core
-version: "1.0.2"
+version: "1.1.0"
 ---
 
 # LMA LMO Sidecar
@@ -53,12 +55,20 @@ Keep the boundary minimal. Do not turn the sidecar into a command or event bus, 
 
 Resolution order: `LMA_HARDWARE_PROFILE` / `LMA_SOFTWARE_PROFILE` / `LMA_DB` → gitignored `integrations/lmo/paths.yaml` → `LMO_ROOT` + `inventory/*.yaml` → LMA local files → templates.
 
+Mock inventory is opt-in. The resolver recognizes `profile.mode: dry_run|dry-run|mock|simulated`, `profile.mock: true`, or `profile.physical_hardware_present: false` and rejects that profile by default. Only when the user explicitly requests a simulation or planning run, use:
+
+```bash
+./scripts/py scripts/lma_paths.py --allow-mock --format json
+```
+
+For another profile-consuming command, pass its `--allow-mock` flag or prefix it with `LMA_ALLOW_MOCK=1`. Confirm the JSON reports `allow_mock: true` and `hardware_profile.mock: true`. Keep mock YAML gitignored/untracked, label every derived result **simulated**, do not describe it as this host, and do not turn estimated throughput into a benchmark claim.
+
 ### 3. Activate a link (only if LMO is cloned)
 
 1. Confirm the LMO clone path exists.
 2. If `integrations/lmo/paths.yaml` already exists, print its `lmo_root` and profile paths and confirm before replacing. Otherwise copy `integrations/lmo/paths.template.yaml` to `integrations/lmo/paths.yaml` (gitignored) and set `lmo_root` plus profile paths, **or** export `LMO_ROOT`, `LMA_HARDWARE_PROFILE`, and `LMA_SOFTWARE_PROFILE`.
-3. Re-run `./scripts/py scripts/lma_paths.py` and check `linked` is true and files exist.
-4. Import the resolved YAML into the DB: `./scripts/py scripts/import-profiles.py`.
+3. Re-run `./scripts/py scripts/lma_paths.py --format json` and check `linked` is true, files exist, and `mock` is false. If the user explicitly chose mock inventory, add `--allow-mock` and preserve that status in the result.
+4. Import the resolved YAML into the DB: `./scripts/py scripts/import-profiles.py`. For an explicit mock exercise use `./scripts/py scripts/import-profiles.py --allow-mock`; the mock declaration remains in the stored YAML snapshot.
 
 If LMO has not created `inventory/` yet, leave LMA on local `computer-profile/` files. Do not invent hardware facts.
 
@@ -67,6 +77,8 @@ If LMO has not created `inventory/` yet, leave LMA on local `computer-profile/` 
 ```bash
 ./scripts/py scripts/export-lmo-snapshot.py
 ```
+
+Add `--allow-mock` only for an explicitly requested mock study pack.
 
 Writes `ref/lma-lmo-snapshot.zip` (gitignored): live hardware YAML, software YAML, `model-assessor.db`, `schema.sql`, templates, contract. Tell the user the zip path. Treat it as a local study pack, not a live feed. It contains the full DB and absolute local paths; do not upload it to GitHub or send it outside the machine.
 
@@ -79,6 +91,7 @@ Give LMO `LMA_ROOT` (this clone) and `LMA_DB` (resolved DB path). LMO must not w
 | Symptom | Likely cause | Fix |
 |---------|--------------|-----|
 | `PathResolutionError` | Env or `paths.yaml` points at a missing file | Fix the path; do not delete the override to "try local" unless the user wants to unlink |
+| `mock profile requires explicit opt-in` | Resolved YAML declares simulated inventory | Use real inventory, or obtain an explicit mock/planning request and rerun with `--allow-mock` |
 | `linked` is false with `LMO_ROOT` set | LMO has no `inventory/` YAML yet | Keep using LMA local profiles until LMO writes them |
 | DB missing | Never initialized | `./scripts/init-db.sh` (honors `LMA_DB`) |
 

@@ -11,7 +11,7 @@ triggers:
 dependencies:
   - lma-assess-import-model
   - lma-ide-config
-version: "1.2.1"
+version: "1.2.2"
 ---
 
 # LMA HF GGUF → Ollama
@@ -33,6 +33,8 @@ Skip if user already supplied a URL or local `.gguf` path.
 ### 1. Pre-flight: hardware check
 
 Run `./scripts/py scripts/lma_paths.py`, read the resolved `hardware_profile` path, and confirm the GGUF size / quant fits its VRAM budget. Do not proceed if it won't fit.
+
+Only for an explicitly requested simulated fit check, run `./scripts/py scripts/lma_paths.py --allow-mock --format json`. Confirm `hardware_profile.mock` is true, label the result simulated, and stop before download, `ollama create`, benchmarking, or import unless the user's request includes those actions with mock inventory.
 
 ### 2. Understand the key semantics
 

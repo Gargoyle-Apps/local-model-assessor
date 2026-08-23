@@ -1,13 +1,17 @@
 #!/usr/bin/env python3
 """
 Import hardware-profile.yaml and software-profile.yaml into model-assessor.db.
-Run from repo root: ./scripts/py scripts/import-profiles.py
+Run from repo root: ./scripts/py scripts/import-profiles.py [--allow-mock]
 
 Resolves files via scripts/lma_paths.py (optional LMO sidecar, else local
 computer-profile/, else templates). Stores YAML in hardware_profile and
 software_profile. LMA works without LMO.
+
+Mock/dry-run profiles require an explicit --allow-mock flag or
+LMA_ALLOW_MOCK=1. Their declaration is preserved in the stored YAML.
 """
 
+import argparse
 import sqlite3
 import sys
 from pathlib import Path
@@ -20,8 +24,22 @@ import lma_paths  # noqa: E402
 
 
 def main():
-    if len(sys.argv) > 1:
-        db_path = Path(sys.argv[1])
+    parser = argparse.ArgumentParser(
+        description="Import resolved LMA hardware/software profiles"
+    )
+    parser.add_argument(
+        "db", nargs="?", type=Path, help="database path (default: resolved LMA DB)"
+    )
+    parser.add_argument(
+        "--allow-mock",
+        action="store_true",
+        default=None,
+        help="allow profiles explicitly marked as mock/dry-run inventory",
+    )
+    args = parser.parse_args()
+
+    if args.db is not None:
+        db_path = args.db
     else:
         try:
             db_path = lma_paths.require_db_path()
@@ -34,8 +52,8 @@ def main():
         sys.exit(1)
 
     try:
-        hw = lma_paths.hardware_profile_path()
-        sw = lma_paths.software_profile_path()
+        hw = lma_paths.hardware_profile_path(allow_mock=args.allow_mock)
+        sw = lma_paths.software_profile_path(allow_mock=args.allow_mock)
     except lma_paths.PathResolutionError as e:
         print(f"Error: {e}", file=sys.stderr)
         sys.exit(1)
@@ -55,7 +73,8 @@ def main():
                 "INSERT OR REPLACE INTO hardware_profile (id, yaml_content, updated_at) VALUES (1, ?, datetime('now'))",
                 (content,),
             )
-            print(f"Imported hardware profile from {hw.path} ({hw.source})")
+            kind = ", mock" if hw.mock else ""
+            print(f"Imported hardware profile from {hw.path} ({hw.source}{kind})")
         else:
             print("Skip: no hardware profile found")
 
@@ -69,7 +88,8 @@ def main():
                 "INSERT OR REPLACE INTO software_profile (id, yaml_content, updated_at) VALUES (1, ?, datetime('now'))",
                 (content,),
             )
-            print(f"Imported software profile from {sw.path} ({sw.source})")
+            kind = ", mock" if sw.mock else ""
+            print(f"Imported software profile from {sw.path} ({sw.source}{kind})")
         else:
             print("Skip: no software profile found")
 

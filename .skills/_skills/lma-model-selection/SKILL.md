@@ -19,7 +19,7 @@ triggers:
 dependencies:
   - lma-db-core
   - lma-ide-config
-version: "1.2.1"
+version: "1.2.2"
 ---
 
 # LMA Model Selection
@@ -53,6 +53,8 @@ Run `ollama list` and compare against DB records. If a model is in the DB but no
 ```
 
 Read `vram_budget` from the resolved `hardware_profile` path. Effective budget ≈ `total_available - os_headroom_gb`.
+
+If resolution reports a mock-profile error, do not silently fall back. Only when the user explicitly wants a simulated recommendation, run `./scripts/py scripts/lma_paths.py --allow-mock --format json`, confirm `hardware_profile.mock` is true, and label the recommendation simulated. Do not install or claim host compatibility from mock inventory.
 
 **Co-run rule:** `(model_vram + concurrency_reserve) < total_available` → can co-run. Heavy Lifters (30–48 GB) run solo.
 

@@ -10,7 +10,7 @@ triggers:
   - estimate model size context and performance
   - hardware upgrade for local models
 dependencies: []
-version: "1.0.1"
+version: "1.0.2"
 ---
 
 # LMA Hardware Assessment
@@ -83,6 +83,8 @@ When no comparable benchmark exists, use relative tiers such as sluggish, batch-
 ### 5. Add the optional current-hardware comparison
 
 If the user has not excluded comparison, run `./scripts/py scripts/lma_paths.py`. Read the resolved `hardware_profile` only when its source is `local`, `env`, `lmo-link`, or `lmo-root`; skip a template or missing source. Keep this section secondary to the standalone assessment.
+
+If the resolver rejects a mock profile, skip it unless the user explicitly asks for a simulated comparison. In that case run `./scripts/py scripts/lma_paths.py --allow-mock --format json`, confirm `hardware_profile.mock` is true, and label the comparison as mock-to-prospective rather than current-to-prospective hardware.
 
 Compare only fields available on both sides:
 

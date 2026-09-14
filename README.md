@@ -24,7 +24,7 @@ For skill, template, and reference changes, review the diff for local values or 
 
 ```bash
 # Clone into your project
-git clone https://github.com/Gargoyle-Apps/Local-Model-Assessor.git .model-assessor
+git clone https://github.com/Gargoyle-Apps/local-model-assessor.git .model-assessor
 
 # Or copy the folder directly
 cp -r /path/to/local-model-assessor .model-assessor

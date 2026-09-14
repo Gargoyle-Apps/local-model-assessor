@@ -13,7 +13,13 @@
 --   created_by_type / updated_by_type: 'local' | 'cloud' | 'human'
 --
 -- Well-known meta keys:
---   last_ollama_scan  — ISO 8601 timestamp of last ollama-search.md run
+--   last_ollama_scan: ISO 8601 timestamp of last ollama-search.md run
+--   last_inventory_reconcile: UTC timestamp of last reconcile-inventory.py --from-ollama run
+--
+-- Inventory (models.inventory_status):
+--   present: still in the assessed catalog (may or may not be pulled yet)
+--   removed: known gone from the local fleet; row kept for history (never DELETE)
+--   removed_at is optional. removed_at_confidence is 'authoritative' | 'best_guess' | NULL.
 
 -- Meta / config (replaces _meta, recommended_fleet)
 CREATE TABLE IF NOT EXISTS meta (
@@ -44,6 +50,13 @@ CREATE TABLE IF NOT EXISTS models (
   latency TEXT,
   superseded_by TEXT,
   user_flag_for_deletion INTEGER DEFAULT 0,
+  inventory_status TEXT NOT NULL DEFAULT 'present'
+    CHECK (inventory_status IN ('present', 'removed')),
+  removed_at TEXT,
+  removed_at_confidence TEXT
+    CHECK (removed_at_confidence IS NULL
+           OR removed_at_confidence IN ('authoritative', 'best_guess')),
+  removal_notes TEXT,
   assessed_at TEXT DEFAULT (datetime('now')),
   created_at TEXT DEFAULT (datetime('now')),
   created_by TEXT,
@@ -181,5 +194,6 @@ CREATE TABLE IF NOT EXISTS software_profile (
 -- Indexes for common queries
 CREATE INDEX IF NOT EXISTS idx_models_class ON models(class);
 CREATE INDEX IF NOT EXISTS idx_models_vram ON models(vram);
+CREATE INDEX IF NOT EXISTS idx_models_inventory_status ON models(inventory_status);
 CREATE INDEX IF NOT EXISTS idx_role_model_role ON role_model(role);
 CREATE INDEX IF NOT EXISTS idx_constraint_model_constraint ON constraint_model(constraint_name);

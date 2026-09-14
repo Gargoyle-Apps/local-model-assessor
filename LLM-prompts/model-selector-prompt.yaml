@@ -32,7 +32,7 @@ content: |
   **DATA SOURCE:** `model-data/model-assessor.db` (SQLite). Run queries yourself:
 
   ```bash
-  ./scripts/query-db.sh "SELECT model_id, vram, class, tps FROM models ORDER BY vram"
+  ./scripts/query-db.sh "SELECT model_id, vram, class, tps FROM models WHERE COALESCE(inventory_status,'present')='present' ORDER BY vram"
   ./scripts/query-db.sh "SELECT role, variant, model_id FROM role_model ORDER BY role, variant"
   ```
 
@@ -48,6 +48,7 @@ content: |
     JOIN models m ON m.model_id = rm.model_id
     LEFT JOIN provisioned_models pm
       ON pm.base_model_id = rm.model_id AND pm.role = rm.role AND pm.variant = rm.variant
+   WHERE COALESCE(m.inventory_status, 'present') = 'present'
    ORDER BY rm.role, rm.variant;
   ```
 

@@ -78,7 +78,14 @@ def main():
             conn.row_factory = sqlite3.Row
             c = conn.cursor()
 
-            c.execute("SELECT * FROM models WHERE superseded_by IS NULL ORDER BY vram, model_id")
+            c.execute(
+                """
+                SELECT * FROM models
+                 WHERE superseded_by IS NULL
+                   AND COALESCE(inventory_status, 'present') = 'present'
+                 ORDER BY vram, model_id
+                """
+            )
             models = [dict(r) for r in c.fetchall()]
 
             c.execute("SELECT * FROM model_docs")
@@ -96,6 +103,8 @@ def main():
                            pm.pull_command, m.class, m.vram, m.tps
                       FROM provisioned_models pm
                       LEFT JOIN models m ON m.model_id = pm.base_model_id
+                     WHERE m.model_id IS NULL
+                        OR COALESCE(m.inventory_status, 'present') = 'present'
                      ORDER BY pm.role, pm.alias
                     """
                 )
@@ -109,7 +118,7 @@ def main():
 
     header = """# Assessed Models
 
-A human-readable reference for all evaluated Ollama models. For machine-readable data, see the database (`model-assessor.db`) or exported JSON.
+A human-readable reference for assessed models that are still in the local catalog (`inventory_status=present` and not superseded). For machine-readable data, see the database (`model-assessor.db`).
 
 > **Hardware:** See `computer-profile/hardware-profile.yaml` (or hardware_profile in DB) for system specifications, VRAM budgets, and hardware class definitions.
 
@@ -256,6 +265,21 @@ Run `./scripts/query-db.sh "SELECT * FROM decision_tree"` for the decision tree.
             if sup:
                 print(f"  ({len(sup)} superseded model(s) excluded: "
                       + ", ".join(f"{r['model_id']} → {r['superseded_by']}" for r in sup) + ")")
+            removed = conn2.execute(
+                """
+                SELECT model_id, removed_at, removed_at_confidence
+                  FROM models
+                 WHERE COALESCE(inventory_status, 'present') = 'removed'
+                 ORDER BY model_id
+                """
+            ).fetchall()
+            if removed:
+                bits = []
+                for r in removed:
+                    when = r["removed_at"] or "unknown"
+                    conf = r["removed_at_confidence"] or "unspecified"
+                    bits.append(f"{r['model_id']} @ {when} ({conf})")
+                print(f"  ({len(removed)} removed model(s) excluded: " + ", ".join(bits) + ")")
     except sqlite3.Error:
         pass
 

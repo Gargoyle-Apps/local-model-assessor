@@ -8,7 +8,7 @@
 
 ### LMA version
 
-**`2.9.0`** – bump **MAJOR** for breaking paths, agent-facing contracts, or DB/schema expectations without a clear migration; **MINOR** for additive capability (e.g. new runtime, integration, or skills surface); **PATCH** for fixes and docs-only; keep **README.md** and this heading in sync; prefer non-`x.y.0` patch on intentional release lines.
+**`2.10.0`** – bump **MAJOR** for breaking paths, agent-facing contracts, or DB/schema expectations without a clear migration; **MINOR** for additive capability (e.g. new runtime, integration, or skills surface); **PATCH** for fixes and docs-only; keep **README.md** and this heading in sync; prefer non-`x.y.0` patch on intentional release lines.
 
 ---
 

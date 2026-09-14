@@ -111,3 +111,5 @@ def test_migrate_from_old_schema_matches_fresh_init(old_schema_db):
     }
     assert migrated_cols == fresh_cols, "Column sets differ after migrate vs fresh init"
     assert "user_flag_for_deletion" in migrated_cols.get("provisioned_models", set())
+    assert "inventory_status" in migrated_cols.get("models", set())
+    assert "removed_at_confidence" in migrated_cols.get("models", set())

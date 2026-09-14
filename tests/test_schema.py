@@ -74,6 +74,19 @@ def test_user_flag_for_deletion_columns():
     conn.close()
 
 
+def test_inventory_status_columns():
+    """Removal ledger lives on models: status plus optional when/confidence."""
+    conn = _fresh_db()
+    c = conn.cursor()
+    c.execute("PRAGMA table_info(models)")
+    cols = {row[1]: row for row in c.fetchall()}
+    conn.close()
+    assert "inventory_status" in cols
+    assert cols["inventory_status"][4] in ("'present'", "present")
+    for name in ("removed_at", "removed_at_confidence", "removal_notes"):
+        assert name in cols, f"models missing {name}"
+
+
 def test_config_tables_lack_provenance():
     provenance_cols = {"created_by", "created_by_type"}
     conn = _fresh_db()

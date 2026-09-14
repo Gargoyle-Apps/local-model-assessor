@@ -1,6 +1,6 @@
 # Local Model Assessor
 
-**Version 2.9.0** — bump criteria: [AGENTS.md](AGENTS.md#lma-version).
+**Version 2.10.0** — bump criteria: [AGENTS.md](AGENTS.md#lma-version).
 
 For **tool-calling agents** in IDEs (Cursor, Cline, Continue, …): query SQLite and run repo scripts — not for chat-only LLMs without shell access.
 
@@ -55,6 +55,7 @@ cp -r /path/to/local-model-assessor .model-assessor
 │   ├── import-profiles.py
 │   ├── lma_paths.py                 # resolve DB + profile paths (optional LMO)
 │   ├── export-lmo-snapshot.py       # zip hardware/software/DB for LMO study
+│   ├── reconcile-inventory.py       # present/removed vs ollama list (+ history seed)
 │   └── query-db.sh
 ├── integrations/                    # copy-out kits: IDE configs + Docker data stack
 │   ├── embed-retrieval-stack/       # Postgres + pgvector + Apache AGE
@@ -102,7 +103,7 @@ cd .model-assessor
 
 # Create empty DB (init-db.sh creates only the database, not profile files)
 ./scripts/init-db.sh
-# Existing DB? Run ./scripts/migrate-schema.sh to add assessed_at and other columns (same LMA_DB override as Python scripts)
+# Existing DB? Run ./scripts/migrate-schema.sh to add assessed_at, inventory_status, and other columns (same LMA_DB override as Python scripts)
 cp computer-profile/hardware-profile.template.yaml computer-profile/hardware-profile.yaml
 cp computer-profile/software-profile.template.yaml computer-profile/software-profile.yaml
 

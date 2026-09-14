@@ -1,6 +1,6 @@
 ---
 name: lma-model-prune
-description: "Supersede a model with a newer generation, OR queue a model for deletion via user_flag_for_deletion, then remove from Ollama and clean up clones."
+description: "Supersede a model with a newer generation, mark inventory_status=removed with optional when/confidence, OR queue a model for deletion via user_flag_for_deletion, then remove from Ollama and clean up clones."
 triggers:
   - prune model
   - supersede model
@@ -14,10 +14,12 @@ triggers:
   - delete queue
   - what can I delete
   - deletion candidates
+  - reconcile inventory
+  - mark removed
 dependencies:
   - lma-db-core
   - lma-ide-config
-version: "1.2.0"
+version: "1.3.0"
 ---
 
 # LMA Model Prune
@@ -33,11 +35,16 @@ Two distinct cleanup paths share this skill:
 
 ## Concepts
 
-- **`models.superseded_by`** — stores the `model_id` of the replacement. `NULL` = active; non-NULL = superseded.
+- **`models.superseded_by`** — stores the `model_id` of the replacement. `NULL` = no successor recorded; non-NULL = superseded.
+- **`models.inventory_status`** — `present` (default, still in the catalog) or `removed` (gone from the local fleet; row kept). Orthogonal to `superseded_by`: a model can be superseded and still installed, or removed with no successor.
+- **`models.removed_at`** — optional UTC timestamp (`%Y-%m-%d %H:%M:%S`). NULL means "removed, when unknown".
+- **`models.removed_at_confidence`** — `authoritative` (observed missing in `ollama list` or `ollama rm` just ran) | `best_guess` (reconstructed from git/docs) | NULL.
+- **`models.removal_notes`** — short provenance for the guess or the rm.
+- **`models.user_flag_for_deletion`** — `INTEGER 0/1`. Set by the user; **does not** hide the model from selection, export, or IDE config (still usable until you actually clean it up). It is purely a queue marker.
 - **`models.user_flag_for_deletion`** — `INTEGER 0/1`. Set by the user; **does not** hide the model from selection, export, or IDE config (still usable until you actually clean it up). It is purely a queue marker.
 - **`provisioned_models.user_flag_for_deletion`** — same semantics, applied to clones. When the user flags a base model, also flag all of its clones unless they specify otherwise.
-- **`superseded_by` is honored automatically only in `export-assessed-models.py`** (superseded rows are omitted from the markdown export). Role selection queries and `generate-ide-config.py` do **not** filter on `superseded_by` unless you complete the prune steps in §A.3/§A.4 (repoint roles, regenerate IDE config). **Flagged-only** models (no supersede) are NOT excluded anywhere until deletion is processed in §C.
-- Rows are never `DELETE`d from `models` — provenance, assessment history, and class/role data are preserved by setting `superseded_by` or by leaving the (now-orphan) row in place after deletion. `provisioned_models` rows for a deleted base may be hard-deleted only as part of §C.
+- **`superseded_by` is honored automatically only in `export-assessed-models.py`** (superseded rows are omitted from the markdown export). **`inventory_status=removed` is also omitted** from that export. Role selection queries and `generate-ide-config.py` do **not** filter on `superseded_by` unless you complete the prune steps in §A.3/§A.4 (repoint roles, regenerate IDE config). Prefer `WHERE COALESCE(inventory_status,'present')='present'` in selection SQL. **Flagged-only** models (no supersede, still `present`) are NOT excluded anywhere until deletion is processed in §C.
+- Rows are never `DELETE`d from `models` on supersede or inventory-removed — provenance stays. After §C you may keep the row with `inventory_status=removed` (recommended) or hard-delete only on explicit confirmation. `provisioned_models` rows for a deleted base may be hard-deleted only as part of §C.
 - The `user_flag_for_deletion` flag is preserved across YAML re-imports (`add-model-from-yaml.py` UPSERT does not touch it) — confirmed by `tests/test_ingestion_end_to_end.py::test_user_flag_for_deletion_preserved_across_reimport`.
 
 ## Change-management rules (mandatory)
@@ -76,7 +83,7 @@ Confirm the **old** model and the **new** model that replaces it. They should ov
 - Same family lineage or direct successor on the upstream card.
 
 ```bash
-./scripts/query-db.sh "SELECT model_id, vram, class, vision, tools, reasoning FROM models WHERE superseded_by IS NULL ORDER BY model_id"
+./scripts/query-db.sh "SELECT model_id, vram, class, vision, tools, reasoning FROM models WHERE superseded_by IS NULL AND COALESCE(inventory_status,'present')='present' ORDER BY model_id"
 ```
 
 ### 2. Mark superseded
@@ -133,6 +140,11 @@ sqlite3 "$DB" "DELETE FROM constraint_model WHERE model_id='<old_model_id>'"
 
 ```bash
 ollama rm <old_model_id>
+sqlite3 "$DB" "UPDATE models SET inventory_status='removed',
+  removed_at='$NOW', removed_at_confidence='authoritative',
+  removal_notes='ollama rm after supersede',
+  updated_at='$NOW', updated_by='$BY', updated_by_type='$BYT'
+  WHERE model_id='<old_model_id>'"
 ```
 
 ### 6. Remove stale Modelfiles
@@ -158,7 +170,7 @@ The export now prints a summary line listing superseded models that were exclude
 - [ ] `models.superseded_by` set to the replacement `model_id`.
 - [ ] Provisioned clones deactivated (`is_active=0`) and removed from Ollama.
 - [ ] `role_model` / `constraint_model` rows cleaned or reassigned.
-- [ ] `ollama rm` run for the base model tag.
+- [ ] Base `ollama rm` run **and** `inventory_status=removed` with `removed_at_confidence=authoritative`.
 - [ ] Stale `.mf` files deleted from `model-data/modelfile/`.
 - [ ] `assessed-models.md` regenerated; superseded models excluded.
 - [ ] IDE config swept (`sweep-ide-config.py`).
@@ -270,9 +282,14 @@ ollama rm <model_id>
 #### d. Decide on the `models` row
 
 Two options, surface both to the user:
-- **Keep for history** (recommended): leave the row, clear the flag, and let it sit as an "assessed but not installed" record. Useful if they ever want to re-pull.
+- **Keep for history** (recommended): leave the row, clear the flag, set `inventory_status=removed` with `removed_at_confidence=authoritative`.
   ```bash
-  sqlite3 "$DB" "UPDATE models SET user_flag_for_deletion=0, updated_at='$NOW', updated_by='$BY', updated_by_type='$BYT' WHERE model_id='<model_id>'"
+  sqlite3 "$DB" "UPDATE models SET user_flag_for_deletion=0,
+    inventory_status='removed',
+    removed_at='$NOW', removed_at_confidence='authoritative',
+    removal_notes='processed deletion queue; ollama rm',
+    updated_at='$NOW', updated_by='$BY', updated_by_type='$BYT'
+    WHERE model_id='<model_id>'"
   ```
 - **Hard delete**: only if the user explicitly says they want the assessment gone.
   ```bash
@@ -312,15 +329,25 @@ rm -f model-data/modelfile/<base-pattern>*.mf
 # Superseded models
 ./scripts/query-db.sh "SELECT model_id, class, vram, superseded_by, updated_at, updated_by FROM models WHERE superseded_by IS NOT NULL ORDER BY updated_at"
 
+# Removed from local inventory (history kept)
+./scripts/query-db.sh "SELECT model_id, inventory_status, removed_at, removed_at_confidence, removal_notes FROM models WHERE inventory_status='removed' ORDER BY removed_at"
+
 # Flagged-but-not-yet-deleted
 ./scripts/query-db.sh "SELECT model_id, class, vram, updated_at, updated_by FROM models WHERE user_flag_for_deletion=1 ORDER BY updated_at"
 ./scripts/query-db.sh "SELECT alias, base_model_id, role, variant, updated_at, updated_by FROM provisioned_models WHERE user_flag_for_deletion=1 ORDER BY updated_at"
 ```
 
+To sync `inventory_status` from the live `ollama list` (authoritative `removed_at=now`) and/or seed known Granite 4.0 history (best-guess dates):
+
+```bash
+./scripts/py scripts/reconcile-inventory.py --dry-run --from-ollama --seed-history
+./scripts/py scripts/reconcile-inventory.py --from-ollama --seed-history
+```
+
 ## Notes
 
 - Never `DELETE FROM models` for the supersede path — always use `superseded_by` to preserve history. For the flag-driven path, hard delete is allowed only on explicit user confirmation in §C.3.d.
-- If a superseded model needs to come back (e.g. successor regresses), clear the column: `UPDATE models SET superseded_by=NULL, updated_at='$NOW', updated_by='$BY', updated_by_type='$BYT' WHERE model_id='...'`.
+- If a superseded model needs to come back (e.g. successor regresses), clear the column **and** inventory: `UPDATE models SET superseded_by=NULL, inventory_status='present', removed_at=NULL, removed_at_confidence=NULL, removal_notes=NULL, updated_at='$NOW', updated_by='$BY', updated_by_type='$BYT' WHERE model_id='...'`.
 - `provisioned_models` rows for superseded bases are kept (with `is_active=0`) for audit; they will not appear in active config generation.
 - `user_flag_for_deletion` is preserved across `add-model-from-yaml.py` re-imports, so re-running an assessment will not silently un-flag anything.
 - Pure role reassignments (no supersede) follow the same provenance rules — every `UPDATE role_model` / `INSERT role_model` must stamp `updated_at/by/by_type`.

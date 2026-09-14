@@ -172,6 +172,42 @@ def test_user_flag_for_deletion_preserved_across_reimport(seeded_db):
     conn.close()
 
 
+def test_inventory_status_preserved_across_reimport(seeded_db):
+    """Removal ledger is operator-managed; YAML re-import must not resurrect a removed row."""
+    _run_ingestion(seeded_db)
+    conn = sqlite3.connect(str(seeded_db))
+    c = conn.cursor()
+    c.execute(
+        """
+        UPDATE models SET
+          inventory_status='removed',
+          removed_at='2026-08-20 00:00:00',
+          removed_at_confidence='best_guess',
+          removal_notes='test'
+        WHERE model_id='test-model:7b'
+        """
+    )
+    conn.commit()
+    conn.close()
+
+    _run_ingestion(seeded_db)
+
+    conn = sqlite3.connect(str(seeded_db))
+    c = conn.cursor()
+    c.execute(
+        """
+        SELECT inventory_status, removed_at, removed_at_confidence, removal_notes
+          FROM models WHERE model_id='test-model:7b'
+        """
+    )
+    status, when, conf, notes = c.fetchone()
+    conn.close()
+    assert status == "removed"
+    assert when == "2026-08-20 00:00:00"
+    assert conf == "best_guess"
+    assert notes == "test"
+
+
 def test_provisioned_anti_loop_columns(seeded_db):
     """repeat_penalty / repeat_last_n round-trip into provisioned_models and the Modelfile."""
     _run_ingestion(seeded_db)

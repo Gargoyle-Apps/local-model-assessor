@@ -20,7 +20,7 @@ Ships **scripts, schema, templates** — empty `model-assessor.db` until you ini
 
 ```bash
 # Clone into your project
-git clone https://github.com/Gargoyle-Apps/Local-Model-Assessor.git .model-assessor
+git clone https://github.com/Gargoyle-Apps/local-model-assessor.git .model-assessor
 
 # Or copy the folder directly
 cp -r /path/to/local-model-assessor .model-assessor

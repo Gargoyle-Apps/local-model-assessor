@@ -19,7 +19,7 @@ triggers:
 dependencies:
   - lma-db-core
   - lma-ide-config
-version: "1.2.2"
+version: "1.2.3"
 ---
 
 # LMA Model Selection
@@ -36,10 +36,10 @@ Follow `LLM-prompts/model-selector-prompt.yaml` for the full decision rubric.
 
 ### 2. Query the DB
 
-Join `role_model` → `provisioned_models` → `models` to find the best candidate:
+Join `role_model` → `provisioned_models` → `models` to find the best candidate (skip removed inventory):
 
 ```bash
-./scripts/query-db.sh "SELECT rm.role, rm.variant, rm.model_id, pm.alias, pm.num_ctx, pm.is_active FROM role_model rm LEFT JOIN provisioned_models pm ON rm.model_id = pm.base_model_id AND rm.role = pm.role ORDER BY rm.role"
+./scripts/query-db.sh "SELECT rm.role, rm.variant, rm.model_id, pm.alias, pm.num_ctx, pm.is_active FROM role_model rm JOIN models m ON m.model_id = rm.model_id LEFT JOIN provisioned_models pm ON rm.model_id = pm.base_model_id AND rm.role = pm.role WHERE COALESCE(m.inventory_status,'present')='present' ORDER BY rm.role"
 ```
 
 ### 3. Check for drift

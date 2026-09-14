@@ -183,6 +183,7 @@ class TestMockProfiles:
         info = lma_paths.describe()
 
         assert info["allow_mock"] is True
+        assert info["simulate_installs"] is True
         assert info["hardware_profile"]["mock"] is True
         assert info["hardware_profile"]["profile_mode"] == "dry_run"
 
@@ -190,6 +191,33 @@ class TestMockProfiles:
         monkeypatch.setenv("LMA_ALLOW_MOCK", "sometimes")
         with pytest.raises(lma_paths.PathResolutionError, match="LMA_ALLOW_MOCK must be"):
             lma_paths.describe()
+
+    def test_allow_mock_flag_file_opts_in(self, isolated_roots, monkeypatch):
+        lma, lmo = isolated_roots
+        mock = self._mock_profile(lmo / "inventory" / "hardware-profile.yaml")
+        monkeypatch.setenv("LMO_ROOT", str(lmo))
+        flag = lma / "integrations" / "lmo" / "allow-mock"
+        flag.parent.mkdir(parents=True, exist_ok=True)
+        flag.write_text("", encoding="utf-8")
+
+        resolved = lma_paths.hardware_profile_path()
+
+        assert resolved.path == mock.resolve()
+        assert resolved.mock is True
+        assert lma_paths.simulate_runtime_installs() is True
+
+    def test_env_false_overrides_flag_file(self, isolated_roots, monkeypatch):
+        lma, lmo = isolated_roots
+        self._mock_profile(lmo / "inventory" / "hardware-profile.yaml")
+        monkeypatch.setenv("LMO_ROOT", str(lmo))
+        flag = lma / "integrations" / "lmo" / "allow-mock"
+        flag.parent.mkdir(parents=True, exist_ok=True)
+        flag.write_text("", encoding="utf-8")
+        monkeypatch.setenv("LMA_ALLOW_MOCK", "0")
+
+        with pytest.raises(lma_paths.PathResolutionError, match="mock profile requires"):
+            lma_paths.hardware_profile_path()
+        assert lma_paths.simulate_runtime_installs() is False
 
 
 class TestDbPath:

@@ -83,6 +83,7 @@ LMA root: {info['lma_root']}
 LMO root: {info['lmo_root'] or '(not linked)'}
 Linked: {info['linked']}
 Mock profiles allowed: {info['allow_mock']}
+Simulated installs (no Ollama downloads): {info['simulate_installs']}
 
 This zip is a **study pack**, not a live link. Production sharing uses absolute
 local paths between two clones (see integrations/lmo/lma-lmo-contract.md).

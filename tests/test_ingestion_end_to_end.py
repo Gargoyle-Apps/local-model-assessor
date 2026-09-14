@@ -229,6 +229,29 @@ def test_provisioned_anti_loop_columns(seeded_db):
     assert "PARAMETER repeat_last_n 256" in mf
 
 
+def test_default_provisioned_clone_is_inactive(seeded_db):
+    _run_ingestion(seeded_db)
+    conn = sqlite3.connect(str(seeded_db))
+    c = conn.cursor()
+    c.execute("SELECT is_active FROM provisioned_models WHERE alias='test-model:7b_coding_8k'")
+    row = c.fetchone()
+    conn.close()
+    assert row is not None
+    assert row[0] == 0
+
+
+def test_simulated_install_marks_provisioned_active(seeded_db, monkeypatch):
+    monkeypatch.setattr(mod.lma_paths, "simulate_runtime_installs", lambda: True)
+    _run_ingestion(seeded_db)
+    conn = sqlite3.connect(str(seeded_db))
+    c = conn.cursor()
+    c.execute("SELECT is_active FROM provisioned_models WHERE alias='test-model:7b_coding_8k'")
+    row = c.fetchone()
+    conn.close()
+    assert row is not None
+    assert row[0] == 1
+
+
 def test_sparse_reimport_preserves_absent_fields(seeded_db):
     """Re-import with sparse YAML must not wipe columns omitted from the file."""
     _run_ingestion(seeded_db)

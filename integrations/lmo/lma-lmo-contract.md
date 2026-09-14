@@ -82,14 +82,18 @@ profile:
 
 LMA treats `mode: dry_run|dry-run|mock|simulated`, `mock: true`, or
 `physical_hardware_present: false` as mock inventory. Resolution rejects such a
-profile by default. The operator must pass `--allow-mock` to supported commands
-or set `LMA_ALLOW_MOCK=1` for the consuming process. Resolved JSON exposes
-`allow_mock`, `mock`, and `profile_mode` so agents can preserve the distinction.
+profile by default. The operator must pass `--allow-mock` to supported commands,
+set `LMA_ALLOW_MOCK=1` for the consuming process, or create gitignored
+`integrations/lmo/allow-mock` for a clone dedicated to mock testing. Resolved JSON
+exposes `allow_mock`, `mock`, `profile_mode`, and `simulate_installs` so agents can
+preserve the distinction.
 
 Mock profiles must remain gitignored/untracked in their owner repo. They are for
 planning, assessment, import, or snapshot exercises only: label derived results
 as simulated, do not claim they describe the host, and do not present estimated
-throughput as a measured benchmark.
+throughput as a measured benchmark. When `simulate_installs` is true, LMA records
+provisioned clones as active in SQLite without downloading weights and without
+deploying IDE config to the operator home directory.
 
 ## Explicit non-goals
 

@@ -54,7 +54,7 @@ Run `ollama list` and compare against DB records. If a model is in the DB but no
 
 Read `vram_budget` from the resolved `hardware_profile` path. Effective budget ≈ `total_available - os_headroom_gb`.
 
-If resolution reports a mock-profile error, do not silently fall back. Only when the user explicitly wants a simulated recommendation, run `./scripts/py scripts/lma_paths.py --allow-mock --format json`, confirm `hardware_profile.mock` is true, and label the recommendation simulated. Do not install or claim host compatibility from mock inventory.
+If resolution reports a mock-profile error, do not silently fall back. Only when the user explicitly wants a simulated recommendation, run `./scripts/py scripts/lma_paths.py --allow-mock --format json` (or rely on `integrations/lmo/allow-mock`), confirm `hardware_profile.mock` is true, and label the recommendation simulated. Do not claim host compatibility from mock inventory. If `simulate_installs` is true, skip `ollama pull` / `ollama create` and treat DB `is_active=1` as simulated.
 
 **Co-run rule:** `(model_vram + concurrency_reserve) < total_available` → can co-run. Heavy Lifters (30–48 GB) run solo.
 

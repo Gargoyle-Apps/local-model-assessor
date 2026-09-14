@@ -212,7 +212,9 @@ For writing and creative tasks, choose based on stage:
         body_parts.append("## Role-tuned provisioned clones (Ollama aliases)\n\n")
         body_parts.append(
             "These rows come from `provisioned_models`. "
-            "`is_active` is set after you run `pull_command` / `create_command` and confirm with `ollama list`.\n\n"
+            "`is_active` is set after you run `pull_command` / `create_command` and confirm with `ollama list`.\n"
+            "On mock/dry-run hardware with opt-in, scans skip those commands and record "
+            "`is_active=1` as a simulated install.\n\n"
         )
         body_parts.append(
             "| Alias | Base model | Role | Variant | num_ctx | Temp | Class | VRAM | t/s | Active |\n"

@@ -14,8 +14,11 @@ Resolution order per artifact (first hit wins):
 
 LMA_ROOT overrides the LMA clone root (default: parent of scripts/).
 LMO_ROOT is the LMO clone root. It does not change LMA ownership of the model DB.
-Profiles declaring mock/dry-run inventory require --allow-mock or
-LMA_ALLOW_MOCK=1. Resolved output preserves their mock status.
+Profiles declaring mock/dry-run inventory require --allow-mock,
+LMA_ALLOW_MOCK=1, or a gitignored integrations/lmo/allow-mock flag
+file (clone-local opt-in; not a global shell export). Resolved output
+preserves mock status. Mock hardware never pulls or creates Ollama
+weights; scans record simulated installs in the DB instead.
 
 CLI (from repo root):
   ./scripts/py scripts/lma_paths.py
@@ -43,6 +46,7 @@ except ImportError:  # pragma: no cover - bootstrap tells the user
 LMO_HARDWARE_RELATIVE = Path("inventory") / "hardware-profile.yaml"
 LMO_SOFTWARE_RELATIVE = Path("inventory") / "software-profile.yaml"
 LINK_RELATIVE = Path("integrations") / "lmo" / "paths.yaml"
+ALLOW_MOCK_FLAG_RELATIVE = Path("integrations") / "lmo" / "allow-mock"
 
 
 @dataclass(frozen=True)
@@ -65,21 +69,31 @@ _FALSE_VALUES = {"0", "false", "no", "off"}
 _MOCK_MODES = {"dry_run", "dry-run", "mock", "simulated"}
 
 
+def allow_mock_flag_path() -> Path:
+    """Clone-local gitignored flag that opts this tree into mock inventory."""
+    return lma_root() / ALLOW_MOCK_FLAG_RELATIVE
+
+
 def mock_profiles_allowed(explicit: Optional[bool] = None) -> bool:
-    """Return whether mock profiles may be consumed for this operation."""
+    """Return whether mock profiles may be consumed for this operation.
+
+    Precedence: explicit CLI/argument, then LMA_ALLOW_MOCK if set, then a
+    gitignored integrations/lmo/allow-mock file. Env ``0``/false still wins
+    over the flag file so a clone can temporarily refuse mock inventory.
+    """
     if explicit is not None:
         return explicit
     raw = os.environ.get("LMA_ALLOW_MOCK")
-    if raw is None:
-        return False
-    normalized = raw.strip().lower()
-    if normalized in _TRUE_VALUES:
-        return True
-    if normalized in _FALSE_VALUES:
-        return False
-    raise PathResolutionError(
-        "LMA_ALLOW_MOCK must be one of: 1, true, yes, on, 0, false, no, off"
-    )
+    if raw is not None:
+        normalized = raw.strip().lower()
+        if normalized in _TRUE_VALUES:
+            return True
+        if normalized in _FALSE_VALUES:
+            return False
+        raise PathResolutionError(
+            "LMA_ALLOW_MOCK must be one of: 1, true, yes, on, 0, false, no, off"
+        )
+    return allow_mock_flag_path().is_file()
 
 
 def lma_root() -> Path:
@@ -166,8 +180,8 @@ def _resolved_profile(
     if is_mock and not mock_profiles_allowed(allow_mock):
         raise PathResolutionError(
             f"mock profile requires explicit opt-in: {path}. "
-            "Pass --allow-mock to lma_paths.py or set LMA_ALLOW_MOCK=1 "
-            "for commands that consume profiles."
+            "Pass --allow-mock, set LMA_ALLOW_MOCK=1, or create "
+            "gitignored integrations/lmo/allow-mock for this clone."
         )
     return ResolvedPath(path, source, mock=is_mock, profile_mode=mode)
 
@@ -267,6 +281,18 @@ def software_profile_path(*, allow_mock: Optional[bool] = None) -> ResolvedPath:
     )
 
 
+def simulate_runtime_installs(*, allow_mock: Optional[bool] = None) -> bool:
+    """True when opted-in mock hardware should record DB installs without Ollama."""
+    allowed = mock_profiles_allowed(allow_mock)
+    if not allowed:
+        return False
+    try:
+        hw = hardware_profile_path(allow_mock=allowed)
+    except PathResolutionError:
+        return False
+    return bool(hw.mock)
+
+
 def describe(*, allow_mock: Optional[bool] = None) -> dict:
     allowed = mock_profiles_allowed(allow_mock)
     hw = hardware_profile_path(allow_mock=allowed)
@@ -278,11 +304,13 @@ def describe(*, allow_mock: Optional[bool] = None) -> dict:
         "lmo-link",
         "lmo-root",
     }
+    simulate = bool(allowed and hw.mock)
     return {
         "lma_root": str(lma_root()),
         "lmo_root": str(root) if root else None,
         "linked": linked,
         "allow_mock": allowed,
+        "simulate_installs": simulate,
         "db": {"path": db.as_str(), "source": db.source},
         "hardware_profile": {
             "path": hw.as_str(),
@@ -304,6 +332,7 @@ def _print_text(info: dict) -> None:
     print(f"lmo_root\t{info['lmo_root'] or ''}")
     print(f"linked\t{str(info['linked']).lower()}")
     print(f"allow_mock\t{str(info['allow_mock']).lower()}")
+    print(f"simulate_installs\t{str(info['simulate_installs']).lower()}")
     for key in ("db", "hardware_profile", "software_profile"):
         block = info[key]
         print(f"{key}\t{block['path']}\t{block['source']}")

@@ -1,6 +1,6 @@
 # Local Model Assessor
 
-**Version 2.10.0** — bump criteria: [AGENTS.md](AGENTS.md#lma-version).
+**Version 2.11.0** — bump criteria: [AGENTS.md](AGENTS.md#lma-version).
 
 For **tool-calling agents** in IDEs (Cursor, Cline, Continue, …): query SQLite and run repo scripts — not for chat-only LLMs without shell access.
 
@@ -10,7 +10,7 @@ For **tool-calling agents** in IDEs (Cursor, Cline, Continue, …): query SQLite
 
 ## Repo vs Local
 
-Ships **scripts, schema, templates** — empty `model-assessor.db` until you init, profile, assess. **`Brewfile`:** optional `brew bundle` → `libpq` (keg-only; see `brew info libpq`); not needed for Docker stack (`docker compose exec`). **Tracked:** templates under `computer-profile/`, `model-data/` (e.g. `*.template.yaml`, `modelfile/.gitkeep`), `scripts/`, `.skills/` + `.skills-harness/` (skills harness; see [Skills harness](#skills-harness-third-party)), `integrations/` (copy-out: IDE + embed stack + `mcp/scout/.gitkeep` + optional LMO contract). **Gitignored:** `computer-profile/hardware-profile.yaml`, `computer-profile/software-profile.yaml`, `model-data/*.db` and SQLite sidecars (`*.db-*`), `model-data/assessed-models.md`, `model-data/new-models.yaml`, `model-data/model-lookup.json`, generated modelfiles, `integrations/mcp/scout/*` (scout notes and field guides), `integrations/lmo/paths.yaml`, local IDE copies (`integrations/IDE-model-management/*/generated/*`, `continue/config.yaml`, `cline/provider-settings.json`, `opencode/opencode.json`, `goose/config.yaml`, `pi/settings.json`, `pi/models.json`, `zed/settings.json`; root `opencode.json` and `opencode.jsonc`), `integrations/embed-retrieval-stack/out/`, `ref/`, `.cursorignore`, `.cursorrules`, `.agents/`, `.continue/`, `.opencode/`, `.venv/`, `.pytest_cache/`. Generated IDE, modelfile, and scout `.gitkeep` placeholders remain tracked. Details: [AGENTS.md](AGENTS.md) + `.gitignore`.
+Ships **scripts, schema, templates** — empty `model-assessor.db` until you init, profile, assess. **`Brewfile`:** optional `brew bundle` → `libpq` (keg-only; see `brew info libpq`); not needed for Docker stack (`docker compose exec`). **Tracked:** templates under `computer-profile/`, `model-data/` (e.g. `*.template.yaml`, `modelfile/.gitkeep`), `scripts/`, `.skills/` + `.skills-harness/` (skills harness; see [Skills harness](#skills-harness-third-party)), `integrations/` (copy-out: IDE + embed stack + `mcp/scout/.gitkeep` + optional LMO contract). **Gitignored:** `computer-profile/hardware-profile.yaml`, `computer-profile/software-profile.yaml`, `model-data/*.db` and SQLite sidecars (`*.db-*`), `model-data/assessed-models.md`, `model-data/new-models.yaml`, `model-data/model-lookup.json`, generated modelfiles, `integrations/mcp/scout/*` (scout notes and field guides), `integrations/lmo/paths.yaml`, `integrations/lmo/allow-mock`, local IDE copies (`integrations/IDE-model-management/*/generated/*`, `continue/config.yaml`, `cline/provider-settings.json`, `opencode/opencode.json`, `goose/config.yaml`, `pi/settings.json`, `pi/models.json`, `zed/settings.json`; root `opencode.json` and `opencode.jsonc`), `integrations/embed-retrieval-stack/out/`, `ref/`, `.cursorignore`, `.cursorrules`, `.agents/`, `.continue/`, `.opencode/`, `.venv/`, `.pytest_cache/`. Generated IDE, modelfile, and scout `.gitkeep` placeholders remain tracked. Details: [AGENTS.md](AGENTS.md) + `.gitignore`.
 
 Actual and hypothetical assessments share this boundary: profiles, database contents, installed-model inventories, reports, and machine-specific conclusions stay local. Custom `LMA_DB` files must also be ignored and untracked. Shared procedures and references may use source-backed public facts or clearly labeled synthetic fixtures, with no assumed hardware target. Field guides record target, profile source, and actual/hypothetical/unknown status separately from the executing host; see the [hardware context contract](.skills/_skills/lma-model-field-guide/references/hardware-context.md). They read existing data without editing profiles or databases. `./scripts/query-db.sh --readonly "SQL"` honors `LMA_DB`.
 
@@ -276,10 +276,12 @@ untracked, and opt in for that operation:
 ./scripts/py scripts/export-lmo-snapshot.py --allow-mock
 ```
 
-Without `--allow-mock` (or `LMA_ALLOW_MOCK=1` for scripts that consume profiles),
-resolution stops instead of silently treating simulated capacity as the current
-machine. The resolver reports `mock` and `profile_mode`; label every derived
-assessment or recommendation as simulated.
+Without `--allow-mock`, `LMA_ALLOW_MOCK=1`, or a gitignored `integrations/lmo/allow-mock`
+flag file, resolution stops instead of silently treating simulated capacity as the current
+machine. The resolver reports `mock`, `profile_mode`, and `simulate_installs`. Label every
+derived assessment or recommendation as simulated. When `simulate_installs` is true, catalog
+scans may update the DB as if models were installed (`is_active=1`) but must not run
+`ollama pull` / `ollama create` and must not deploy Continue config to `$HOME`.
 
 Pack a local study zip of the current hardware YAML, software YAML, and model DB (writes gitignored `ref/lma-lmo-snapshot.zip`):
 

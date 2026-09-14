@@ -74,3 +74,22 @@ class TestNormalizeOllamaTag:
 
     def test_explicit_tag(self):
         assert mod._normalize_ollama_tag("llama3:8b") == "llama3:8b"
+
+
+class TestProvisionedAliases:
+    def test_normalizes_and_skips_missing_table(self, tmp_path):
+        db = tmp_path / "empty.db"
+        import sqlite3
+
+        sqlite3.connect(str(db)).close()
+        assert mod.provisioned_aliases(db) == set()
+
+        conn = sqlite3.connect(str(db))
+        conn.execute(
+            "CREATE TABLE provisioned_models (alias TEXT PRIMARY KEY, is_active INTEGER)"
+        )
+        conn.execute("INSERT INTO provisioned_models VALUES ('llama3', 0)")
+        conn.execute("INSERT INTO provisioned_models VALUES ('qwen:7b', 0)")
+        conn.commit()
+        conn.close()
+        assert mod.provisioned_aliases(db) == {"llama3:latest", "qwen:7b"}

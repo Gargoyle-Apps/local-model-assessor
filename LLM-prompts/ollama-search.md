@@ -10,14 +10,12 @@ A guidance document for tool-calling AI agents to discover new Ollama models wor
 
 1. **Fetch** the Ollama popular models page
 2. **Parse** entries into structured data (template below)
-3. **Pre-filter** using hardware and software profiles (redundant with full assessment, but narrows the funnel)
-4. **Prioritize** models that are new-to-DB or newly updated on Ollama since last scan
-5. **Exclude** Cloud-only models — they are remote API proxies, not local weights (see note above)
+3. **Gate** every entry – cloud-only, architecture/runtime, memory fit, licence, role need (§ 3a). Failing any gate is disqualifying.
+4. **Rank** the survivors – provenance tier, then generation recency, then popularity, with packaging recency as tiebreak only (§ 3b)
+5. **On Apple Silicon**, resolve each surviving library candidate to its same-size `-mlx` tag when one exists (discrete from mlx-lm; see `lma-assess-import-model`). Non-Apple hosts skip MLX entirely – it fails the architecture gate.
 6. **Cap** at 7 candidate models for full assessment
-7. **On Apple Silicon**, resolve each library candidate to its same-size `-mlx` tag when one exists (discrete from mlx-lm; see `lma-assess-import-model`)
-8. **Compare** candidates to existing DB models — only assess if they "beat" in size, performance, or unmet need
-9. **Assess** accepted candidates using `LLM-prompts/model-assessment-prompt.yaml` and insert into DB
-10. **Update** last scan timestamp in the database
+7. **Assess** accepted candidates using `LLM-prompts/model-assessment-prompt.yaml` and insert into DB, assigning roles by fit at this point
+8. **Update** last scan timestamp in the database
 
 ---
 
@@ -63,41 +61,91 @@ Use this JSON shape as a template for what to extract from each Ollama listing. 
 
 ---
 
-## 3. Prioritization
+## 3. Gates, then Ranking
 
-**Highest priority:**
-- Models at the **top of the popular list** (higher rank = more interest)
-- Models **updated on Ollama since last DB scan** (`updated` parsed from page vs. `meta.last_ollama_scan` in DB)
-- Models **not yet in the database** (`models.model_id`)
+Candidate selection is **two stages**. Gates are pass/fail and admit no trade-off. Ranking only orders the models that survive every gate. Do not blend the two – a model does not earn points for clearing a gate.
+
+### 3a. Gates (pass/fail)
+
+| Gate | Fails when |
+|------|-----------|
+| **Cloud-only** | The model exists only as a remote API proxy (see hard exclusion above) |
+| **Architecture / runtime** | The weights cannot run on this host's accelerator and OS architecture per the software profile. Apple Silicon resolves to the same-size `-mlx` tag when one exists; **non-Apple hosts never take MLX** (neither Ollama `-mlx` tags nor `mlx-community` safetensors), because MLX is Apple-only |
+| **Memory fit** | Weights + KV at the intended `num_ctx` exceed `total_available - os_headroom_gb` |
+| **Licence and terms** | The licence forbids the intended use, or carries conditions the user has not accepted (e.g. revenue thresholds, vendor open-model agreements, non-commercial or research-only clauses). Record the licence in `model_docs.caveats` |
+| **Role need** | The model neither fills an unmet role nor serves an assigned role better than the incumbent – this is the "beat" test in § 5 |
+
+A model that fails any gate is skipped, however new or popular it is.
+
+### 3b. Ranking (orders the survivors)
+
+Apply in order; each criterion only breaks ties left by the one above it.
+
+1. **Provenance tier** – official first-party release, then a fork by a recognised open-source org (assess but **flag** it, e.g. `mlx-community`), then an individual's fork (**never** without explicit user permission).
+2. **Model generation recency** – when the model family or architecture itself was released or superseded upstream.
+3. **Popularity** – pulls on Ollama, downloads on Hugging Face, position on the popular list.
+4. **Packaging recency** – the Ollama `updated` stamp, a re-quant, or a repackage. **Tiebreak only.**
+
+> **Do not let packaging recency outrank generation recency.** Ollama's "Updated 2 days ago" describes when someone rebuilt the GGUF, not when the model got better. A freshly repackaged older generation loses to a newer generation packaged months ago. Ranking a superseded family first because its tag looked fresher is the specific failure this ordering exists to prevent.
+
+**Role fit is not a ranking criterion.** It decides *which* role a survivor is assigned to, and it is applied after gates and ranking, when writing `by_role`.
+
+### 3c. Primary vs alternative within a role
+
+Ranking decides which models **qualify** for a role. Which one takes `primary` is decided by **role fit**, and for interactive roles (`coding`, `autocomplete`, `formatting`, `generalist`, `reasoning`) that means preferring estimated throughput, because a slower model taxes every single response. `reasoning` is the most sensitive of these, since long chains of thought multiply the cost of a low `tps`.
+
+This can invert rank order, and that is intended: a newer generation that decodes at half the speed of a slightly older sibling is the wrong default for an interactive role.
+
+**Keep the rank-order pick in the `alternative` slot rather than dropping it.** It stays provisioned and available, so the choice can be revisited once real workflow tests exist rather than being re-litigated from the catalogue. Record the reason for the split in a comment next to `by_role` so the trade-off is legible later.
 
 **Query last scan:**
 ```bash
 ./scripts/query-db.sh "SELECT value FROM meta WHERE key='last_ollama_scan'"
 ```
 
-If empty, treat all models as candidates. When `updated` is relative (e.g. "5 days ago", "2 months ago"), use heuristics: "X hours ago" or "X days ago" with X small = recently updated; "X months ago" = older.
+If empty, treat all models as candidates. When `updated` is relative (e.g. "5 days ago", "2 months ago"), use heuristics: "X hours ago" or "X days ago" with X small = recently repackaged; "X months ago" = older. Remember this is packaging recency (rank 4), not generation recency (rank 2) – establish generation from the upstream model card or release notes, not from the Ollama stamp.
 
 ---
 
-## 4. Pre-Filter by Profiles
+## 4. Evaluating the Gates Against the Profiles
 
-Before full assessment, apply a quick filter using:
+Resolve the live profiles first – never read the templates when a linked or local profile exists:
 
-- **`computer-profile/hardware-profile.template.yaml`** (or local `hardware-profile.yaml` if present)
-  - `vram_budget.total_available` — can this model fit? (rough check from `size_variants`)
-  - `hardware_classes` — which class would it fall into?
-  - `context_strategy` — any constraints?
+```bash
+./scripts/py scripts/lma_paths.py --format json
+```
 
-- **`computer-profile/software-profile.template.yaml`** (or local `software-profile.yaml`)
-  - `model_runtime: Ollama` — we assume Ollama; no change needed for local.
+Then check the memory-fit and architecture gates against them.
 
-Skip models that clearly exceed VRAM or don't fit your hardware class strategy.
+- **Hardware profile** (`hardware_profile` in the resolver output)
+  - `vram_budget.total_available` and `os_headroom_gb` – effective budget for the memory-fit gate
+  - `concurrency_reserve` – needed for the co-run judgement, not the gate itself
+  - `hardware_classes` – which class the model falls into
+  - `context_strategy` – caps on `num_ctx`
+  - For MoE models, gate on **resident** memory (all experts are loaded even though only some activate per token), not on active-parameter count
+
+- **Software profile** (`software_profile` in the resolver output)
+  - `model_runtime` – the runtimes actually installed. A model whose only distribution format needs a runtime this host does not have **fails the architecture gate**, regardless of merit.
+  - Accelerator and OS architecture – decides the MLX question. Apple Silicon prefers same-size `-mlx` tags; anything else excludes MLX entirely.
+
+If the profile is mock, every conclusion drawn here is **simulated**. Confirm `hardware_profile.mock` and `simulate_installs` in the resolver output before describing fit or throughput.
+
+### Estimating `tps`: bandwidth, not FLOPS
+
+Single-stream decode on local hardware is almost always **memory-bandwidth-bound**, not compute-bound: each token requires reading the active weights from memory. So estimate `tps` from bytes read per token against the host's memory bandwidth, and treat vendor peak-FLOPS or low-precision throughput figures as close to irrelevant for interactive single-user decode.
+
+Two consequences that catch people out:
+
+- **Do not derive `tps` from VRAM size alone.** Resident footprint and decode speed are different quantities. For MoE, footprint tracks **resident** parameters (gate on this) while decode tracks **active** parameters (estimate `tps` from this). A 30B-A3B MoE can decode several times faster than a dense 31B while occupying similar memory, so ordering `tps` inversely by VRAM inverts MoE models.
+- **Low-precision compute formats need not raise `tps`.** A narrower weight format helps mainly by reducing bytes read; its arithmetic advantage is wasted at batch 1 on a bandwidth-bound host. Where a faster runtime does win is prefill and time-to-first-token, plus concurrent throughput, neither of which is `tps`.
+
+`tps` is an estimate unless measured. On a mock profile it is a **simulated placeholder** – never present it as a measurement, and prefer a published benchmark on the same silicon over a guess when one exists.
 
 ---
 
-## 5. "Beat" Criterion
+## 5. "Beat" Criterion – the Role-Need Gate
 
-A candidate **beats** existing models if it improves at least one of:
+This is the mechanism behind the **role need** gate in § 3a, not a separate later step. A candidate **beats** existing models if it improves at least one of:
 
 | Dimension | Beat means |
 |-----------|------------|
@@ -137,10 +185,7 @@ For each accepted candidate, follow **`LLM-prompts/model-assessment-prompt.yaml`
    ./scripts/py scripts/add-model-from-yaml.py model-data/new-models.yaml
    ./scripts/py scripts/export-assessed-models.py
    ```
-4. After clones are built in Ollama, sweep IDE config (`lma-ide-config` skill):
-   ```bash
-   ./scripts/py scripts/sweep-ide-config.py
-   ```
+4. After clones are built in Ollama, sweep IDE config (`lma-ide-config` skill). On opted-in mock hardware (`simulate_installs: true`), skip `ollama pull` / `ollama create` and still run the sweep: the DB records simulated `is_active=1` and does not deploy Continue to `$HOME`.
 
 New models get `assessed_at` set automatically when inserted.
 
@@ -161,13 +206,16 @@ After completing a scan (whether or not any models were added), update the DB:
 - [ ] Fetch `https://ollama.com/search?o=popular`
 - [ ] Parse entries into JSON template (name, url, description, categories, size_variants, pulls, updated)
 - [ ] Exclude Cloud-only models (`categories` = only `cloud`) — never add to DB; inform user to check HuggingFace for local alternatives
-- [ ] Check `meta.last_ollama_scan` and prioritize new/recently-updated
-- [ ] Pre-filter with hardware/software profiles
-- [ ] On Apple Silicon, resolve each candidate to its same-size `-mlx` tag when the library ships one
+- [ ] Resolve live profiles with `lma_paths.py --format json`; note `mock` / `simulate_installs`
+- [ ] Apply the gates: architecture/runtime, memory fit (resident, not active, for MoE), licence and terms, role need
+- [ ] Rank survivors: provenance tier → generation recency → popularity → packaging recency (tiebreak only)
+- [ ] Confirm generation recency from the upstream model card, **not** the Ollama `updated` stamp
+- [ ] On Apple Silicon, resolve each candidate to its same-size `-mlx` tag when the library ships one; on any other host, exclude MLX
 - [ ] Compare to current fleet — only keep candidates that "beat" on size, performance, or need
 - [ ] Cap at 7 candidates
+- [ ] Assign roles by fit only after gates and ranking
 - [ ] If none qualify: return explanation and stop
-- [ ] Otherwise: assess each via `LLM-prompts/model-assessment-prompt.yaml`, run `add-model-from-yaml.py`, `export-assessed-models.py`, then `sweep-ide-config.py` after Ollama inventory is current
+- [ ] Otherwise: assess each via `LLM-prompts/model-assessment-prompt.yaml`, run `add-model-from-yaml.py`, `export-assessed-models.py`, then `sweep-ide-config.py`. On mock hardware with `simulate_installs`, skip Ollama downloads and still sweep.
 - [ ] Update `meta.last_ollama_scan` with `datetime('now')`
 
 ---

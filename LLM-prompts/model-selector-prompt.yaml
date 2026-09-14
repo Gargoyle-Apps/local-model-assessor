@@ -19,7 +19,7 @@ content: |
   - Hardware class definitions with VRAM ranges and expected t/s
   - Context window strategies
 
-  Mock/dry-run profiles are rejected by default. Only when the user explicitly requests a simulated recommendation, rerun with `--allow-mock`, confirm `hardware_profile.mock` is `true`, and label the recommendation simulated. Do not install a model or claim compatibility with the current host on that basis. If reading an imported DB snapshot instead, inspect its YAML `profile` mapping for the same mock markers before using it.
+  Mock/dry-run profiles are rejected by default. Only when the user explicitly requests a simulated recommendation, rerun with `--allow-mock` (or rely on `integrations/lmo/allow-mock`), confirm `hardware_profile.mock` is `true`, and label the recommendation simulated. Do not install a model or claim compatibility with the current host on that basis. If `simulate_installs` is `true`, treat `is_active=1` as a simulated catalog state and skip `ollama list` / `ollama pull`. If reading an imported DB snapshot instead, inspect its YAML `profile` mapping for the same mock markers before using it.
 
   **CREATIVE QUALITY TIERS:**
   For writing and creative tasks, consider the draft stage:

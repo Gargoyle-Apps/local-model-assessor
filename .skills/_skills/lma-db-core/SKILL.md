@@ -16,7 +16,7 @@ triggers:
   - reconcile inventory
   - removed models
 dependencies: []
-version: "1.3.0"
+version: "1.3.1"
 ---
 
 # LMA Database Core
@@ -82,7 +82,7 @@ Always pass the SQL as a quoted string argument. No args opens an interactive sh
 
 - **Scripts (flags):** `query-db.sh "SQL"` — always pass SQL string. `init-db.sh` / `migrate-schema.sh` — empty DB / schema migrations. `reconcile-inventory.py --from-ollama` / `--seed-history` / `--dry-run`.
 - **Python:** `./scripts/py scripts/<name>.py` (see `lma-python-env` skill). `add-model-from-yaml.py` — provenance via args or env. `export-assessed-models.py [path]`. `import-profiles.py [db] [--allow-mock]`. `generate-ide-config.py --target continue|cline [--active-only] [--dry-run]`. `sweep-ide-config.py` — run after model add/remove or clone create (see `lma-ide-config` skill). `generate-stack-handoff.py [--output-dir DIR]`.
-- **Env:** `LMA_DB` overrides the DB path for every consumer. Without it, `LMA_ROOT` relocates the default DB for Python scripts and DB shell wrappers. `LMA_HARDWARE_PROFILE`, `LMA_SOFTWARE_PROFILE`, and `LMO_ROOT` are optional LMO sidecar overrides. `LMA_ALLOW_MOCK=1` is an explicit per-process opt-in for mock/dry-run profiles; do not set it globally.
+- **Env:** `LMA_DB` overrides the DB path for every consumer. Without it, `LMA_ROOT` relocates the default DB for Python scripts and DB shell wrappers. `LMA_HARDWARE_PROFILE`, `LMA_SOFTWARE_PROFILE`, and `LMO_ROOT` are optional LMO sidecar overrides. `LMA_ALLOW_MOCK=1` is an explicit per-process opt-in for mock/dry-run profiles; do not set it in the user shell profile. A gitignored `integrations/lmo/allow-mock` flag opts in one clone. Opted-in mock hardware records simulated installs (`is_active=1`) without Ollama downloads.
 
 ### 7. Hardware budget and co-run rule
 

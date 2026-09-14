@@ -9,6 +9,9 @@ Usage:
   ./scripts/py scripts/sweep-ide-config.py --dry-run
   ./scripts/py scripts/sweep-ide-config.py --target continue --no-deploy
   ./scripts/py scripts/sweep-ide-config.py --no-sync
+
+Mock/dry-run hardware (opted in) skips `ollama list`, marks provisioned
+aliases active as simulated installs, and does not deploy Continue to $HOME.
 """
 
 from __future__ import annotations
@@ -115,6 +118,20 @@ def _normalize_ollama_tag(tag: str) -> str:
         return f"{tag}:latest"
     name, _, rev = tag.partition(":")
     return f"{name}:{rev or 'latest'}"
+
+
+def provisioned_aliases(db_path: Path) -> set[str]:
+    aliases: set[str] = set()
+    with sqlite3.connect(str(db_path)) as conn:
+        c = conn.cursor()
+        c.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='provisioned_models'")
+        if not c.fetchone():
+            return aliases
+        c.execute("SELECT alias FROM provisioned_models")
+        for (alias,) in c.fetchall():
+            if alias:
+                aliases.add(_normalize_ollama_tag(str(alias)))
+    return aliases
 
 
 def ollama_aliases() -> Optional[set[str]]:
@@ -301,6 +318,12 @@ def main():
         print(f"Error: {exc}", file=sys.stderr)
         sys.exit(1)
 
+    try:
+        simulate_installs = lma_paths.simulate_runtime_installs()
+    except lma_paths.PathResolutionError as exc:
+        print(f"Error: {exc}", file=sys.stderr)
+        sys.exit(1)
+
     profile = _read_software_profile()
     targets = detect_targets(profile, explicit=args.target)
     if not args.target:
@@ -310,10 +333,21 @@ def main():
         else:
             print(f"No agent names in software-profile; generating all targets: {', '.join(targets)}")
 
+    skip_deploy = args.no_deploy or simulate_installs
+    if simulate_installs and not args.no_deploy:
+        print(
+            "Mock hardware opted in: skipping Continue deploy to $HOME. "
+            "Repo copies only (simulated fleet)."
+        )
+
     installed_aliases: Optional[set[str]] = None
     if not args.no_sync:
-        print("Syncing provisioned_models.is_active from ollama list...")
-        installed_aliases = ollama_aliases()
+        if simulate_installs:
+            print("Syncing provisioned_models.is_active as simulated installs (no ollama list)...")
+            installed_aliases = provisioned_aliases(db_path)
+        else:
+            print("Syncing provisioned_models.is_active from ollama list...")
+            installed_aliases = ollama_aliases()
         activated, deactivated = sync_provisioned_active(
             db_path, dry_run=args.dry_run, installed=installed_aliases
         )
@@ -330,14 +364,14 @@ def main():
         if path:
             print(f"Wrote {gen_mod.TARGETS[target][0]} config to {path}")
 
-    if not args.no_deploy:
+    if not skip_deploy:
         for target in targets:
             src = generated_this_run.get(target)
             if src is None:
                 continue
             deploy_target(target, src, dry_run=args.dry_run)
 
-    if not args.dry_run and not args.no_deploy and "continue" in targets:
+    if not args.dry_run and not skip_deploy and "continue" in targets:
         print("Restart Continue or reload VS Code to pick up config changes.")
 
 

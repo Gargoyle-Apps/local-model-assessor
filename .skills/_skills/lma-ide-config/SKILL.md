@@ -12,7 +12,7 @@ triggers:
 dependencies:
   - lma-python-env
   - lma-db-core
-version: "1.1.1"
+version: "1.1.2"
 ---
 
 # LMA IDE Config
@@ -40,10 +40,10 @@ Run after any of these events (do not wait for the user to ask):
 
 The sweep script:
 
-1. Sets `provisioned_models.is_active` from `ollama list` (installed → `1`, missing → `0`).
+1. Sets `provisioned_models.is_active` from `ollama list` (installed → `1`, missing → `0`). On opted-in mock hardware, skips `ollama list` and marks every provisioned alias active as a simulated install.
 2. Regenerates config for targets named in the resolved software profile (`lma_paths.py`: LMO sidecar or `computer-profile/software-profile.yaml`; `primary_agent`, `embedded_assistant`, `optional_agents`). Falls back to all supported targets if names are unset.
 3. Writes repo copies under `integrations/IDE-model-management/<app>/`.
-4. Deploys **Continue** to `~/.continue/config.yaml`. **Cline/Roo** stay in-repo — import via the extension UI (no stable global path).
+4. Deploys **Continue** to `~/.continue/config.yaml` unless mock hardware is opted in (then repo copies only). **Cline/Roo** stay in-repo — import via the extension UI (no stable global path).
 
 | Flag | Purpose |
 |------|---------|

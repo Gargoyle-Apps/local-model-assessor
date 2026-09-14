@@ -28,7 +28,7 @@ content: |
   ./scripts/py scripts/lma_paths.py
   ```
   Inspect the resolver output before importing. Only when `linked` is `false`, copy a local profile whose reported source is `template` or `missing`, edit it with real facts, then rerun `lma_paths.py`. Never create local fallback profiles during a linked LMO workflow.
-  Mock/dry-run inventory is rejected by default. Only when the user explicitly requests a simulated assessment, rerun `lma_paths.py --allow-mock --format json`, confirm `hardware_profile.mock` is `true`, and use `import-profiles.py --allow-mock` if a DB snapshot is needed. Label all derived fit, context, and performance conclusions simulated; do not claim the profile describes this host or that estimated throughput was measured.
+  Mock/dry-run inventory is rejected by default. Only when the user explicitly requests a simulated assessment, rerun `lma_paths.py --allow-mock --format json` (or rely on `integrations/lmo/allow-mock`), confirm `hardware_profile.mock` is `true`, and use `import-profiles.py --allow-mock` if a DB snapshot is needed. Label all derived fit, context, and performance conclusions simulated; do not claim the profile describes this host or that estimated throughput was measured. When `simulate_installs` is `true`, import YAML and record simulated installs; do not run `ollama pull` or `ollama create`.
   After the resolved profiles contain real facts—or explicitly allowed mock facts for a simulated exercise—import them:
   ```bash
   ./scripts/py scripts/import-profiles.py
@@ -42,6 +42,28 @@ content: |
   - Quantization preferences
   - Hardware class definitions and thresholds
   - Context window strategy
+
+  **SELECTION RUBRIC (GATES, THEN RANKING):**
+  Selection is two stages. **Gates** are pass/fail and admit no trade-off. **Ranking** only orders the models that clear every gate. Never blend them – a model earns nothing for merely clearing a gate. Full detail in `LLM-prompts/ollama-search.md` § 3.
+
+  Gates – fail any one and the model is out, however new or popular:
+  1. **Cloud-only** – remote API proxies are never candidates.
+  2. **Architecture / runtime** – the weights must run on this host's accelerator and OS architecture per the software profile's `model_runtime`. Apple Silicon resolves to the same-size `-mlx` tag when one exists; **non-Apple hosts exclude MLX entirely** (both Ollama `-mlx` tags and `mlx-community` safetensors), since MLX is Apple-only.
+  3. **Memory fit** – weights + KV at the intended `num_ctx` must fit `total_available - os_headroom_gb`. For MoE, gate on **resident** memory, not active-parameter count.
+  4. **Licence and terms** – reject licences that forbid the intended use or impose conditions the user has not accepted (revenue thresholds, vendor open-model agreements, non-commercial or research-only clauses). Always record the licence in `model_docs.caveats`.
+  5. **Role need** – the model must fill an unmet role or serve an assigned role better than the incumbent ("beat" on size, performance, or need).
+
+  Ranking – apply in order, each breaking only the ties left by the one above:
+  1. **Provenance tier** – official first-party release, then a fork by a recognised open-source org (assess but **flag** it, e.g. `mlx-community`), then an individual's fork (**never** without explicit user permission).
+  2. **Model generation recency** – when the family or architecture was released or superseded upstream.
+  3. **Popularity** – Ollama pulls, Hugging Face downloads, popular-list position.
+  4. **Packaging recency** – Ollama's `updated` stamp, a re-quant, or a repackage. **Tiebreak only.**
+
+  Do **not** let packaging recency outrank generation recency: "Updated 2 days ago" means someone rebuilt the GGUF, not that the model improved. A freshly repackaged older generation loses to a newer generation packaged months ago. Establish generation from the upstream model card, not the Ollama stamp.
+
+  **Role fit is not a ranking criterion.** It decides which role a survivor takes when you write `by_role`, after gates and ranking.
+
+  **Primary vs alternative within a role:** ranking decides which models qualify; **role fit** decides which takes `primary`. For interactive roles (`coding`, `autocomplete`, `formatting`, `generalist`, `reasoning`) prefer estimated throughput, since a slower model taxes every response – `reasoning` most of all, because long chains of thought multiply a low `tps`. This may invert rank order, which is intended. **Keep the rank-order pick as the `alternative`** rather than dropping it, so it stays provisioned for reassessment after real workflow tests.
 
   **PROVISIONED CLONES (required per assigned role):**
   For every canonical role this model fills (`by_role`), add one `provisioning` list entry so role-tuned Ollama aliases can be built with safe `num_ctx` (follow rules below).
@@ -134,7 +156,7 @@ content: |
     model-name:tag:
       description: "1-2 sentence summary of the model."
       best_for: "Use case 1, use case 2, use case 3"
-      caveats: "Known limitations or requirements (Ollama version, FIM, context limits, prompt tips)"
+      caveats: "Licence and any conditions, plus known limitations or requirements (Ollama version, FIM, context limits, prompt tips)"
   ```
 
   **Optional top-level blocks** (if applicable to the assessment batch):
@@ -166,12 +188,14 @@ content: |
   ## CLASSIFICATION CHECKLIST (internal; determines your YAML output):
 
   For each model, determine:
-  1. **Class:** Which hardware class based on VRAM? (see hardware_classes in profile)
-  2. **Primary Role:** What canonical role does it best fill?
-  3. **Capabilities:** Does it have vision? tools? reasoning? FIM? MoE?
-  4. **Context:** What's the recommended context window given VRAM budget? (see context_strategy)
-  5. **Speed:** Estimated tokens/sec based on class?
-  6. **Co-run:** Can it run alongside a Speedster model? (vram + concurrency_reserve < total_available?)
+  1. **Gates:** Does it clear all five gates above (cloud-only, architecture/runtime, memory fit, licence, role need)? If not, report why and stop – do not emit YAML for it.
+  2. **Class:** Which hardware class based on VRAM? (see hardware_classes in profile)
+  3. **Primary Role:** What canonical role does it best fill?
+  4. **Capabilities:** Does it have vision? tools? reasoning? FIM? MoE?
+  5. **Context:** What's the recommended context window given VRAM budget? (see context_strategy)
+  6. **Speed:** Estimated tokens/sec. Single-stream decode is **memory-bandwidth-bound**, so estimate from bytes read per token against host memory bandwidth, not from vendor peak-FLOPS figures. Do not derive `tps` from VRAM size alone: for MoE, footprint tracks **resident** params (what you gate on) while decode tracks **active** params (what sets `tps`), so a 30B-A3B MoE can decode several times faster than a dense 31B of similar footprint. On a mock profile `tps` is a **simulated placeholder** – prefer a published benchmark on the same silicon over a guess.
+  7. **Co-run:** Can it run alongside a Speedster model? (vram + concurrency_reserve < total_available?)
+  8. **Licence:** Which licence, and does it carry conditions worth recording in `model_docs.caveats`?
 
   ---
   ## EXAMPLE OUTPUT:

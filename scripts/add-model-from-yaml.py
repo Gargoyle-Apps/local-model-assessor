@@ -266,6 +266,7 @@ def upsert_provisioned(
     entry: dict,
     assessor: str,
     assessor_type: str,
+    simulate_install: bool = False,
 ) -> tuple[Optional[str], list]:
     """Insert/update provisioned_models. Returns (alias, pending_modelfile_ops).
 
@@ -355,7 +356,7 @@ def upsert_provisioned(
     prior = c.fetchone()
     if prior:
         old_path_str, was_active, old_content, old_alias = prior
-        if was_active and (
+        if was_active and not simulate_install and (
             old_content != modelfile_content or old_alias != alias
         ):
             print(
@@ -364,6 +365,8 @@ def upsert_provisioned(
                 f"after rebuilding the clone in Ollama.",
                 file=sys.stderr,
             )
+
+    is_active = 1 if simulate_install else 0
 
     has_repeat_params = (
         _has_column(c, "provisioned_models", "repeat_penalty")
@@ -385,7 +388,7 @@ def upsert_provisioned(
               repeat_penalty, repeat_last_n, system_prompt,
               modelfile_content, modelfile_path, create_command, pull_command, is_active,
               created_at, created_by, created_by_type, updated_at, updated_by, updated_by_type
-            ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,0,?,?,?,?,?,?)
+            ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
             ON CONFLICT(base_model_id, role, variant) DO UPDATE SET
               alias=excluded.alias,
               num_ctx=excluded.num_ctx,
@@ -399,6 +402,7 @@ def upsert_provisioned(
               create_command=excluded.create_command,
               pull_command=excluded.pull_command,
               is_active=CASE
+                WHEN excluded.is_active = 1 THEN 1
                 WHEN excluded.modelfile_content = provisioned_models.modelfile_content
                  AND excluded.alias = provisioned_models.alias
                 THEN provisioned_models.is_active
@@ -423,6 +427,7 @@ def upsert_provisioned(
                 modelfile_path,
                 create_command,
                 pull_command,
+                is_active,
                 now,
                 assessor,
                 assessor_type,
@@ -438,7 +443,7 @@ def upsert_provisioned(
               alias, base_model_id, role, variant, num_ctx, temperature, num_predict, system_prompt,
               modelfile_content, modelfile_path, create_command, pull_command, is_active,
               created_at, created_by, created_by_type, updated_at, updated_by, updated_by_type
-            ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,0,?,?,?,?,?,?)
+            ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
             ON CONFLICT(base_model_id, role, variant) DO UPDATE SET
               alias=excluded.alias,
               num_ctx=excluded.num_ctx,
@@ -450,6 +455,7 @@ def upsert_provisioned(
               create_command=excluded.create_command,
               pull_command=excluded.pull_command,
               is_active=CASE
+                WHEN excluded.is_active = 1 THEN 1
                 WHEN excluded.modelfile_content = provisioned_models.modelfile_content
                  AND excluded.alias = provisioned_models.alias
                 THEN provisioned_models.is_active
@@ -472,6 +478,7 @@ def upsert_provisioned(
                 modelfile_path,
                 create_command,
                 pull_command,
+                is_active,
                 now,
                 assessor,
                 assessor_type,
@@ -774,6 +781,17 @@ def main():
         print(f"Error: {exc}", file=sys.stderr)
         sys.exit(1)
 
+    try:
+        simulate_install = lma_paths.simulate_runtime_installs()
+    except lma_paths.PathResolutionError as exc:
+        print(f"Error: {exc}", file=sys.stderr)
+        sys.exit(1)
+    if simulate_install:
+        print(
+            "Mock hardware opted in: recording provisioned clones as simulated "
+            "installs (is_active=1). Not pulling or creating Ollama weights."
+        )
+
     assessor = args.assessor or "unknown"
     assessor_type = args.assessor_type or "human"
 
@@ -809,7 +827,13 @@ def main():
                     if not isinstance(entry, dict):
                         continue
                     done_alias, ops = upsert_provisioned(
-                        c, str(model_id), install, entry, assessor, assessor_type
+                        c,
+                        str(model_id),
+                        install,
+                        entry,
+                        assessor,
+                        assessor_type,
+                        simulate_install=simulate_install,
                     )
                     modelfile_ops.extend(ops)
                     if done_alias:

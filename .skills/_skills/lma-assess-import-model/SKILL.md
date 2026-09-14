@@ -23,7 +23,7 @@ dependencies:
   - lma-python-env
   - lma-db-core
   - lma-ide-config
-version: "1.3.2"
+version: "1.3.3"
 ---
 
 # LMA Assess & Import Model
@@ -60,7 +60,7 @@ Read `LLM-prompts/model-assessment-prompt.yaml` for the full assessment rubric. 
 
 Run `./scripts/py scripts/lma_paths.py`, read the resolved `hardware_profile` path, and gate all assessments on that file — especially `vram_budget`, `context_strategy`, and heavy-lifter / co-run rules. Do not assume full advertised context from the upstream card.
 
-Mock hardware is rejected by default. Only when the user explicitly asks to assess against simulated inventory, rerun `./scripts/py scripts/lma_paths.py --allow-mock --format json`, confirm `hardware_profile.mock` is true, and label the assessment simulated. A mock budget supports fit planning only: do not claim the host can run the model, install or benchmark on that basis, or report estimated `tps` as measured.
+Mock hardware is rejected by default. Only when the user explicitly asks to assess against simulated inventory, rerun `./scripts/py scripts/lma_paths.py --allow-mock --format json` (or rely on gitignored `integrations/lmo/allow-mock`), confirm `hardware_profile.mock` is true, and label the assessment simulated. A mock budget supports fit planning only: do not claim the host can run the model or report estimated `tps` as measured. When `simulate_installs` is true, import YAML as usual but do not run `ollama pull` / `ollama create`; the importer records simulated `is_active=1`.
 
 ### 3. Write assessment YAML
 
@@ -90,7 +90,9 @@ Generates `model-data/assessed-models.md` (or a custom path).
 
 ### 6. Build clones in Ollama (when provisioning)
 
-For each new or updated `provisioning` row, run the base `install` command (if needed), then each clone `create_command` from the DB or Modelfile path. Confirm with `ollama list`.
+Skip this step when `simulate_installs` is true. Do not pull or create weights.
+
+For each new or updated `provisioning` row on real hardware, run the base `install` command (if needed), then each clone `create_command` from the DB or Modelfile path. Confirm with `ollama list`.
 
 ```bash
 ./scripts/query-db.sh "SELECT alias, create_command, pull_command FROM provisioned_models WHERE base_model_id='<model_id>'"

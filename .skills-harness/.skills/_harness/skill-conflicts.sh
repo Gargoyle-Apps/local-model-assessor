@@ -67,13 +67,13 @@ warn() { echo "WARN:  $1" >&2; warnings=$((warnings + 1)); }
 # Physical (symlink-resolved) path of a directory, or empty if it doesn't exist.
 canon_dir() { ( cd "$1" 2>/dev/null && pwd -P ) || true; }
 
-# --- Collect repo-managed skill names (skip _-prefixed like _skills helpers) ---
+# --- Collect repo-managed skills (exclude harness internals and backups) ---
 skill_names=()
 if [[ -d "$SKILLS_DIR" ]]; then
   for d in "$SKILLS_DIR"/*/; do
     [[ -d "$d" ]] || continue
     n="$(basename "$d")"
-    case "$n" in _*) continue ;; esac
+    case "$n" in _*|*.bak) continue ;; esac
     [[ -f "$d/SKILL.md" ]] || continue
     skill_names+=("$n")
   done

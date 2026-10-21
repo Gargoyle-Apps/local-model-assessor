@@ -1,14 +1,12 @@
 {
-  "description": "Trigger eval cases for caveman-review. Near-misses target general caveman mode and commit messages.",
+  "description": "Trigger eval cases for requested terse review formatting. Generic review commands and PR reviews must retain the host workflow and default style.",
   "should_trigger": [
-    "review this PR",
-    "code review the diff",
     "caveman review",
     "/caveman-review",
-    "review the changes",
-    "give me PR comments",
     "terse code review",
-    "one-line review comments"
+    "one-line review comments",
+    "Review this PR with terse, one-line findings.",
+    "/codereview with caveman-style comments"
   ],
   "should_not_trigger": [
     "use caveman mode",
@@ -18,6 +16,13 @@
     "/caveman-commit",
     "compress output",
     "less tokens",
-    "conventional commit subject"
+    "conventional commit subject",
+    "/review",
+    "/codereview",
+    "review this PR",
+    "code review the diff",
+    "review the changes",
+    "give me PR comments",
+    "Review the new deploy-check skill for security."
   ]
 }

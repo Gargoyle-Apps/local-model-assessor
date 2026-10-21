@@ -22,7 +22,7 @@ Use after `.skills-harness/` already exists (subtree-vendored consumer repo).
      --skip-subtree --reconcile --symlink-consumer-skills
    ```
 
-   `--skip-subtree` tells the script the kit is already vendored and to act in update-mode. The dry-run prints planned changes to `.skills/_index.md`, `.skills/_meta.yml`, and any new symlinks for consumer skills under `consumer_skills_dir:`.
+   `--skip-subtree` tells the script the kit is already vendored and to act in update-mode. The dry-run prints planned changes to configured indexes, `.skills/_meta.yml`, and any new symlinks for consumer skills under `consumer_skills_dir:`.
 
 4. **Apply:**
 
@@ -32,7 +32,7 @@ Use after `.skills-harness/` already exists (subtree-vendored consumer repo).
    ```
 
    What this does:
-   - **`--reconcile`** rewrites `.skills/_index.md` by dropping every existing kit-skill row and re-inserting upstream's rows for those names; consumer rows and intro text/comments are preserved verbatim. Bumps `kit_version` and `repo_url` in `.skills/_meta.yml` to match the subtree's copy; every other field (`role`, `prefixes`, `consumer_skills_dir`, custom keys) is preserved. Idempotent — re-running prints `ok already matches` for both files.
+   - **`--reconcile`** regenerates every configured index from installed local `SKILL.md` frontmatter after refreshing skill shims, using the same ordering and wording as `build-index.sh`. Edit consumer row wording in frontmatter; upstream index rows are never copied. Root routing prose and child prose outside generated markers are preserved. Bumps only `kit_version` and `repo_url` in `.skills/_meta.yml`; other fields remain unchanged. No extra generation pass is needed. See `.skills/_harness/index-layout.md` for optional split configuration and ownership. Dry-run includes rows from planned kit and consumer shim additions without modifying the working tree.
    - **`--symlink-consumer-skills`** (only if `consumer_skills_dir:` is declared in `_meta.yml`) walks that directory, ignores entries without a `SKILL.md` and ignores anything whose name collides with a kit skill, and creates `.skills/_skills/<name> → ../../<consumer_skills_dir>/<name>` symlinks for the rest. Pre-existing real directories are never clobbered (the script warns and skips). Idempotent.
 
 5. **Confirm native discovery.** Migration now creates/syncs every target declared under `native_targets:` in `.skills/_meta.yml`. If this consumer predates that field, select a target during migration with `--native-target .agents/skills` (or `.claude/skills`). You can also repair all declared targets directly:

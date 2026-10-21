@@ -21,6 +21,8 @@ For repos that need to stay tool-neutral (used across Cursor, Claude Code, Winds
 
 Native hosts receive each skill's `name` and `description` and use that compact catalog for routing. The full index is consulted only when native discovery is unavailable, a match is ambiguous or missing, the host reports omitted skills, or the catalog itself is being maintained. Once a skill is selected, only its unconditional `dependencies` load immediately; branch-specific companions load at their documented decision point. Skills cannot override user intent or agent core behavior; they only provide domain-specific procedures.
 
+Each description must stand on its own: what the skill does, when to use it, and relevant exclusions. Harness-only `triggers` and human-authored routing notes supplement that text; they must not be the sole source of a routing distinction. Prefix families describe deployment and ownership, not a mandatory family-first routing tier. Skill frontmatter is authoritative for generated catalog rows.
+
 ## DESIGN.md integration
 
 Repos with a visual design system can add [DESIGN.md](https://github.com/google-labs-code/design.md) (Google Labs) alongside the harness. Each layer owns one job:
@@ -33,7 +35,7 @@ Repos with a visual design system can add [DESIGN.md](https://github.com/google-
 
 Point `AGENTS.md` at `DESIGN.md` for UI work; keep design tokens in `DESIGN.md` YAML front matter, not in `AGENTS.md` or skill files. Validate with `npx -y -p @google/design.md designmd lint DESIGN.md`.
 
-Load **skill-reviewer** when reviewing skill changes (quality, security, harness layout). **skill-author** covers creating skills; **skill-catalog-maintainer** audits the catalog; **skill-import** / **skill-export** handle cross-repo vendoring.
+Load **skill-reviewer** for a direct review of specific skills or a bounded skill-specific pass within authoring or repository review. General code/PR reviews, including `/review` and `/codereview`, retain the host's full scope and output format; skill findings feed into that review. **caveman-review** supplies terse wording only when requested. **skill-author** covers creating skills; **skill-catalog-maintainer** audits the catalog; **skill-import** / **skill-export** handle cross-repo vendoring.
 
 ## Install shapes: Single-Tool vs Tool-Neutral
 
@@ -79,14 +81,24 @@ Each `SKILL.md` opens with YAML frontmatter. See [skill-template](.skills/_skill
 | `triggers` | harness only | Phrases that should cause this skill to load |
 | `dependencies` | harness only | Unconditional prerequisite skill names (`[]` if none) |
 | `version` | harness only | Semver string (e.g. `1.0.0`) |
+| `compatibility` | optional Agent Skills field | Specific environment requirements, 1–500 characters when present |
+| `metadata` | optional Agent Skills field | String-to-string annotations, such as `family`; not a routing gate |
 
 `name` and `description` follow the [agentskills.io specification](https://agentskills.io/specification) and are used by IDEs with native skill discovery. The harness adds `triggers`, `dependencies`, and `version`; IDEs that don't recognize them silently ignore them. See [`.skills/_index.md`](.skills/_index.md) for bundled skills.
+
+Optional `compatibility` and `metadata` stay in skill frontmatter and are validated when present. Keep selection-critical requirements in `description` too; optional field support varies by host. The kit supports single-line strings and flat block/flow string maps; see [skill-template](.skills/_skills/skill-template/SKILL.md#optional-portability-fields) for examples and supported YAML forms.
 
 ### Writing skill prose
 
 Use lite, direct agent prose: remove filler and hedging, but keep short, complete sentences. Keep `description` and `triggers` in natural user language because they carry routing. Preserve explicit actors, conjunctions, step order, confirmation gates, and safety language whenever compression could make them ambiguous; do not substitute invented abbreviations or arrows for causality in those instructions.
 
 For size pressure, prune conditional dependencies, remove duplication, and move optional bulk to explicitly gated `references/`. Keep common-path decisions and safety gates in `SKILL.md`. Never bulk-rewrite a catalog into ultra-caveman prose merely to satisfy a size warning.
+
+### Generated catalog layouts
+
+The default remains one generated table in `.skills/_index.md`. For catalogs with measured fallback-lookup pressure, an optional split layout generates a small root directory of links and one child index per declared prefix, plus an explicit fallback group for kit and unmatched skills. Keep cross-family routing notes in the root; agents can follow only the relevant child link. Splitting does not reduce native description cost or require family-first native routing.
+
+Read [the index layout contract](.skills/_harness/index-layout.md) before configuring a split. Run `.skills/_harness/build-index.sh --dry-run` to inspect file and row changes, then `--write` for an approved migration. Reconciliation uses the same installed frontmatter and generator, and `check.sh` checks every configured generated index. Legacy multi-table layouts are diagnosed; consolidate them explicitly while preserving consumer prose before generating.
 
 ## Native IDE discovery
 
@@ -124,7 +136,7 @@ For upgrading from an older harness version, use the bundled **harness-upgrade**
 ## Adding a skill
 
 1. Copy [skill-template](.skills/_skills/skill-template/SKILL.md) to `.skills/_skills/<name>/SKILL.md` and edit.
-2. Add a row to [`.skills/_index.md`](.skills/_index.md).
+2. Run `.skills/_harness/build-index.sh --write` to regenerate catalog rows from skill frontmatter.
 3. Run `.skills/_harness/check.sh --link` to refresh every declared native target.
 4. For the full checklist, load the **skill-author** skill.
 
@@ -218,7 +230,7 @@ For progressive skill loading via MCP, see [skillport](https://github.com/gotala
 
 ## Kit version
 
-**Current release:** `1.6.0`
+**Current release:** `1.7.0`
 
 - **Canonical:** [`kit_version` in `.skills/_meta.yml`](.skills/_meta.yml)
 - **History:** [CHANGELOG.md](CHANGELOG.md)

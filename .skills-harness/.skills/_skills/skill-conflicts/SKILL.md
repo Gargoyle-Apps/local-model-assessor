@@ -9,7 +9,7 @@ triggers:
   - check skill conflicts
   - does my config conflict with repo skills
 dependencies: []
-version: "1.2.0"
+version: "1.2.1"
 ---
 
 # Skill Conflicts
@@ -19,6 +19,8 @@ version: "1.2.0"
 Load when the user asks whether a skill managed by **this repo** (`.skills/_skills/<name>/`) collides with something in their **IDE user config** — for example after deploying **caveman** to user-level config, after adding a repo skill whose name might already exist at the user level, or when a `/name` invocation behaves unexpectedly.
 
 ## What counts as a conflict
+
+The repo inventory excludes internal directories beginning with `_` and migration backups ending in `.bak`.
 
 Skills in this repo are discovered alongside user-level config: skills in `~/.cursor/skills/`, `~/.claude/skills/`, Codex's current `$HOME/.agents/skills/`, and the legacy `~/.codex/skills/` path during migration, plus slash-commands / prompts in `~/.cursor/commands/`, `~/.claude/commands/`, `~/.codex/prompts/`. A collision on the same **name** is a problem only when the definitions differ:
 

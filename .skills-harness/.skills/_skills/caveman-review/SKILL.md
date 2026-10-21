@@ -1,18 +1,18 @@
 ---
 name: caveman-review
-description: "When the user wants a code or PR review — ultra-compressed one-line comments (location, problem, fix) with optional severity prefixes."
+description: "Formats code-review findings as terse, actionable comments when the user requests caveman review, terse review, or one-line review comments. General code/PR reviews and /review or /codereview alone do not select this style."
 triggers:
-  - review this PR
-  - code review
-  - review the diff
   - caveman review
-  - /review
+  - terse code review
+  - one-line review comments
   - /caveman-review
 dependencies: []
-version: "1.0.0"
+version: "1.1.0"
 ---
 
 Write code review comments terse and actionable. One line per finding. Location, problem, fix. No throat-clearing.
+
+Use this style only when explicitly requested or already established by the user. It formats findings within the host's review workflow; it does not replace that workflow, narrow repository coverage, or claim generic review commands. Preserve any required output schema, severity convention, and supporting detail; shorten prose within those constraints.
 
 ## Rules
 
@@ -57,7 +57,7 @@ Drop terse mode for: security findings (CVE-class bugs need full explanation + r
 
 ## Boundaries
 
-Reviews only — does not write the code fix, does not approve/request-changes, does not run linters. Output the comment(s) ready to paste into the PR. "stop caveman-review" or "normal mode": revert to verbose review style.
+This pass formats findings. Code inspection, validation, fixes, and authorized hosted review actions remain governed by the parent workflow. Return findings in the caller's required format; use paste-ready comments only when no other format is specified. "stop caveman-review" or "normal mode": revert to normal review style.
 
 ## Notes
 

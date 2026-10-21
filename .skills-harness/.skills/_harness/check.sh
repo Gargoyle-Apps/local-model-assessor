@@ -14,7 +14,7 @@ set -euo pipefail
 #  10. kit_version in _meta.yml matches newest CHANGELOG release, README, and AGENTS_skills.md
 #
 # Options:
-#   --quiet              Suppress success footer
+#   --quiet              Suppress success output; retain warnings and errors
 #   --link               Create/sync every declared native discovery target, then validate
 #   SKILLS_AUTO_LINK=1   Same as --link
 
@@ -82,41 +82,22 @@ trim() {
   printf '%s' "$s"
 }
 
-# --- 1 & 2: Index ↔ directory consistency ---
+# Migration backups and harness internals are not active catalog entries.
+is_catalog_skill() {
+  case "$1" in _*|*.bak) return 1 ;; esac
+  return 0
+}
 
-if [[ ! -f "$INDEX_FILE" ]]; then
-  err "_index.md not found at $INDEX_FILE"
+# --- 1 & 2: Generated index coverage, uniqueness, links, and wording ---
+# One pipeline owns single/split validation and generation. Comparing generated
+# output detects missing, stale, duplicate, misplaced rows and broken links.
+if index_output="$(SKILLS_HARNESS_DIR="$HARNESS_DIR" SKILLS_DIR="$SKILLS_DIR" \
+  SKILLS_INDEX="$INDEX_FILE" SKILLS_META="$META_FILE" \
+  bash "$HARNESS_DIR/build-index.sh")"; then
+  $QUIET || printf '%s\n' "$index_output"
 else
-  index_names=()
-  while IFS='|' read -r _ name _rest || [[ -n "${name:-}${_rest:-}" ]]; do
-    name="$(trim "$name")"
-    [[ -z "$name" || "$name" == "name" || "$name" == "---"* ]] && continue
-    index_names+=("$name")
-  done < "$INDEX_FILE"
-
-  for name in ${index_names[@]+"${index_names[@]}"}; do
-    if [[ ! -d "$SKILLS_DIR/$name" ]]; then
-      err "Index lists '$name' but no directory at _skills/$name/"
-    fi
-    if [[ ! -f "$SKILLS_DIR/$name/SKILL.md" ]]; then
-      err "Index lists '$name' but no SKILL.md at _skills/$name/SKILL.md"
-    fi
-  done
-
-  if [[ -d "$SKILLS_DIR" ]]; then
-    for dir in "$SKILLS_DIR"/*/; do
-      # Guard: bash has no nullglob by default, so an empty dir leaves '*/' literal.
-      [[ -d "$dir" ]] || continue
-      dir_name="$(basename "$dir")"
-      found=false
-      for name in ${index_names[@]+"${index_names[@]}"}; do
-        [[ "$name" == "$dir_name" ]] && found=true && break
-      done
-      if ! $found; then
-        err "Directory _skills/$dir_name/ exists but has no row in _index.md"
-      fi
-    done
-  fi
+  [[ -z "$index_output" ]] || printf '%s\n' "$index_output"
+  err "Generated index validation failed; review build-index.sh dry-run above"
 fi
 
 # --- 3 & 4: Frontmatter validation ---
@@ -127,6 +108,8 @@ if [[ -d "$SKILLS_DIR" ]]; then
   for skill_file in "$SKILLS_DIR"/*/SKILL.md; do
     [[ ! -f "$skill_file" ]] && continue
     dir_name="$(basename "$(dirname "$skill_file")")"
+
+    is_catalog_skill "$dir_name" || continue
 
     in_frontmatter=false
     frontmatter_closed=false
@@ -145,6 +128,9 @@ if [[ -d "$SKILLS_DIR" ]]; then
         fi
       fi
       if $in_frontmatter; then
+        # Optional metadata keys may reuse names such as description/version.
+        # Only top-level fields satisfy the skill frontmatter contract.
+        [[ "$line" == [[:space:]]* ]] && continue
         key="$(trim "$(echo "$line" | cut -d: -f1)")"
         for f in "${required_fields[@]}"; do
           if [[ "$key" == "$f" ]]; then
@@ -170,6 +156,9 @@ if [[ -d "$SKILLS_DIR" ]]; then
 
     if [[ -n "$fm_name" && "$fm_name" != "$dir_name" ]]; then
       err "$dir_name/SKILL.md: frontmatter name '$fm_name' does not match directory name '$dir_name'"
+    fi
+    if ! LC_ALL=C awk -f "$HARNESS_DIR/validate-optional-frontmatter.awk" "$skill_file"; then
+      err "$dir_name/SKILL.md: invalid optional compatibility/metadata frontmatter"
     fi
   done
 fi
@@ -203,7 +192,7 @@ if [[ -d "$SKILLS_DIR" ]]; then
   for skill_file in "$SKILLS_DIR"/*/SKILL.md; do
     [[ -f "$skill_file" ]] || continue
     dir_name="$(basename "$(dirname "$skill_file")")"
-    case "$dir_name" in _*) continue ;; esac
+    is_catalog_skill "$dir_name" || continue
     catalog_names+=("$dir_name")
 
     skill_bytes="$(LC_ALL=C wc -c < "$skill_file" | tr -d '[:space:]')"
@@ -348,7 +337,7 @@ $transitive_reports
 EOF
 
 if (( native_metadata_estimate > NATIVE_METADATA_LIMIT )); then
-  warn "native skill metadata estimate is $native_metadata_estimate characters (threshold: $NATIVE_METADATA_LIMIT; Codex unknown-window reference: 8000)"
+  warn "native skill metadata estimate is $native_metadata_estimate characters (configured review threshold: $NATIVE_METADATA_LIMIT; not a runtime limit)"
 fi
 
 if [[ -f "$INDEX_FILE" ]]; then
@@ -372,9 +361,7 @@ if [[ -d "$SKILLS_DIR" ]]; then
   for skill_dir in "$SKILLS_DIR"/*/; do
     [[ -d "$skill_dir" ]] || continue
     dir_name="$(basename "$skill_dir")"
-    case "$dir_name" in
-      _*) continue ;;
-    esac
+    is_catalog_skill "$dir_name" || continue
     skill_file="$skill_dir/SKILL.md"
     [[ -f "$skill_file" ]] || continue
 
@@ -468,15 +455,13 @@ else
   warn "_rules.md not found; skipping Rules sync check"
 fi
 
-# Skill names managed by the harness (mirrors link.sh: skip _-prefixed dirs).
+# Skill names managed by the harness (mirrors link.sh: exclude internals/backups).
 skill_names=()
 if [[ -d "$SKILLS_DIR" ]]; then
   for skill_dir in "$SKILLS_DIR"/*/; do
     [[ -d "$skill_dir" ]] || continue
     name="$(basename "$skill_dir")"
-    case "$name" in
-      _*) continue ;;
-    esac
+    is_catalog_skill "$name" || continue
     [[ -f "$skill_dir/SKILL.md" ]] || continue
     skill_names+=("$name")
   done
@@ -506,7 +491,9 @@ kit_skill_names=()
 if $HAS_SUBTREE; then
   for kit_dir in "$SUBTREE_SKILLS_DIR"/*/; do
     [[ -d "$kit_dir" ]] || continue
-    kit_skill_names+=("$(basename "$kit_dir")")
+    kit_name="$(basename "$kit_dir")"
+    is_catalog_skill "$kit_name" || continue
+    kit_skill_names+=("$kit_name")
   done
 fi
 
@@ -634,7 +621,12 @@ native_expected_skills_base() {
 if $AUTO_LINK; then
   for symdir in ${native_symdirs[@]+"${native_symdirs[@]}"}; do
     $QUIET || echo "Syncing native discovery: $symdir"
-    "$HARNESS_DIR/link.sh" --no-record "$symdir"
+    if link_output="$("$HARNESS_DIR/link.sh" --no-record "$symdir")"; then
+      $QUIET || printf '%s\n' "$link_output"
+    else
+      [[ -z "$link_output" ]] || printf '%s\n' "$link_output" >&2
+      err "Native discovery synchronization failed for '$symdir'"
+    fi
   done
 fi
 
@@ -692,6 +684,10 @@ for symdir in ${native_symdirs[@]+"${native_symdirs[@]}"}; do
   for link in "$symdir_abs"/*; do
     [[ -e "$link" || -L "$link" ]] || continue
     name="$(basename "$link")"
+    if ! is_catalog_skill "$name" && [[ -L "$link" ]] && [[ "$(readlink "$link")" == "$rel_skills/$name" ]]; then
+      err "$symdir/$name exposes an inactive backup/internal directory through native discovery. Run: .skills/_harness/link.sh $symdir  (or: check.sh --link)"
+      continue
+    fi
     found=false
     for skill_name in ${skill_names[@]+"${skill_names[@]}"}; do
       [[ "$skill_name" == "$name" ]] && found=true && break
@@ -764,7 +760,7 @@ fi
 
 # --- Summary ---
 
-echo ""
+$QUIET && (( errors == 0 )) || echo ""
 if (( errors == 0 )); then
   $QUIET || echo "All checks passed."
 else

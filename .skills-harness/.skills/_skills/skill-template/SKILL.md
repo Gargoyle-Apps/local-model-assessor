@@ -8,7 +8,7 @@ triggers:
   - skill layout
   - refactor to skill
 dependencies: []
-version: "1.4.0"
+version: "1.5.0"
 ---
 
 # Skill Template
@@ -43,11 +43,24 @@ Do **not** place scripts or extra markdown loose at the skill root; `check.sh` w
 
 1. Copy this file to `.skills/_skills/<name>/SKILL.md`.
 2. Set `name` to match the directory name exactly — kebab-case, 1–64 characters, lowercase alphanumeric and hyphens only, no leading/trailing/consecutive hyphens ([agentskills.io](https://agentskills.io/specification) `name` rules).
-3. Write `description` as one sentence, 1–1024 characters — used by the harness index and native IDE skill matching ([agentskills.io](https://agentskills.io/specification) `description` rules).
-4. List natural-language `triggers` users might say.
+3. Write a self-sufficient `description`, 1–1024 characters: what the skill does, when it loads, and relevant exclusions that distinguish nearby skills. Native hosts route from this text without harness-only fields or index notes ([agentskills.io](https://agentskills.io/specification) `description` rules).
+4. List natural-language `triggers` users might say; keep their routing distinctions present in the description too. Prefix families are deployment/ownership conventions, not a mandatory family-first loading step.
 5. Put only unconditional runtime companions in `dependencies`; load branch-specific companions from the body step that needs them.
 6. Fill **When to use**, **Instructions**, and **Examples** for the agent.
 7. If the skill needs bundled files, add `scripts/`, `references/`, and/or `assets/` and link to them from `SKILL.md` with relative paths. Optional trigger evals: `references/trigger-evals.json`.
+
+## Optional portability fields
+
+Use `compatibility` only for specific environment requirements (1–500 characters). Use `metadata` for optional string annotations. These fields travel with the skill; host support varies, so selection-critical requirements must also appear in `description`.
+
+```yaml
+compatibility: "Requires a consumer checkout containing mods.yaml and servers[]."
+metadata:
+  family: server
+  revision: "1"
+```
+
+The zero-dependency validator supports single-line plain or quoted strings and flat block maps, or flow maps such as `metadata: {family: server}`. Quote text that YAML would treat as a number, boolean, or null. Use `metadata: {}` for an empty map. Multiline scalars, aliases, tags, nested collections, and complex escapes are not supported by the kit validator; use single-line strings with literal UTF-8 instead. Optional fields are preserved in frontmatter and do not add catalog columns. `metadata.family` is an annotation; `_meta.yml` prefix declarations control optional index grouping.
 
 ## Body scaffolds (copy into your skill)
 

@@ -6,7 +6,7 @@ triggers:
   - new skill
   - register a skill
 dependencies: []
-version: "2.1.0"
+version: "2.2.0"
 ---
 
 # Skill Author
@@ -23,9 +23,9 @@ version: "2.1.0"
    - In a consumer repo, prefix the name using `.skills/_meta.yml` or the repo directory name.
    - Read [references/naming.md](references/naming.md) when deriving, choosing, or validating a prefix. Do not rename existing unprefixed skills unless asked.
 2. Create `.skills/_skills/<name>/` and copy `.skills/_skills/skill-template/SKILL.md` into it. Load `skill-template` only when canonical layout or refactor guidance beyond that scaffold is needed.
-3. Fill in frontmatter. `name` must exactly match the directory; keep `description` under 1024 characters and include both what the skill does and when it loads.
+3. Fill in frontmatter. `name` must exactly match the directory; keep `description` within 1–1024 characters and include what the skill does, when it loads, and relevant near-miss exclusions. For optional `compatibility` and `metadata`, follow **skill-template** when those fields are needed.
 4. Write imperative, agent-facing instructions in lite, direct prose. Keep one default per concept and include a brief reason only when it changes behavior.
-5. Add natural-language `triggers`. Test one realistic user phrase; if the index entry would not clearly route it here, tighten the description or triggers and retest.
+5. Add natural-language `triggers` that repeat intent already expressed by the description. Test a realistic positive phrase and a near miss against the description alone; if routing is unclear, fix the description and retest. Prefixes and fallback-index notes cannot supply missing native routing scope.
 6. List only unconditional runtime companions in `dependencies`; load branch-specific companions in the relevant body step. Use `dependencies: []` when none. Avoid cycles.
 7. Put bundled files in the standard subdirectories and link every file from `SKILL.md`:
    - `scripts/` for executable helpers
@@ -41,6 +41,8 @@ version: "2.1.0"
 
 - Use third person in `description`; avoid “I” and “you can use this.”
 - State what the skill does and when it should load; be explicit enough to avoid under-triggering.
+- Include a meaningful exclusion where a neighboring skill could be confused with this one; do not add boilerplate exclusions. Prefix families express ownership and deployment, not an extra discovery tier.
+- Optional `compatibility` records environment requirements; `metadata` holds string annotations such as `family`. Repeat selection-critical requirements in `description`, because hosts may not expose optional fields during discovery.
 - Use phrases users naturally say as triggers, not broad single words or internal jargon.
 - Set `version`; make `dependencies` explicit.
 - Optional trigger cases live in [references/trigger-evals.json](references/trigger-evals.json).

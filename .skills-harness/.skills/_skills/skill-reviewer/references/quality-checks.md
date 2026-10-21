@@ -4,7 +4,7 @@
 
 ## Q1. Description triggering (HIGH when broken, MEDIUM when weak)
 
-The `description` (and harness `triggers`) carry the burden of loading. Apply [optimizing-descriptions](https://agentskills.io/skill-creation/optimizing-descriptions):
+Native discovery routes from `name` and `description`; harness `triggers` supplement fallback lookup. Apply [optimizing-descriptions](https://agentskills.io/skill-creation/optimizing-descriptions):
 
 | Rule | Check | Severity if violated |
 |---|---|---|
@@ -12,7 +12,7 @@ The `description` (and harness `triggers`) carry the burden of loading. Apply [o
 | Harness `triggers` | Phrases match how users ask; not single vague words | MEDIUM |
 | Concise, ≤1024 chars | Hard cap on `description` | HIGH if over |
 
-Skills-harness repos also list `triggers` in `.skills/_index.md` — verify overlap between `description` and `triggers` without duplication.
+Keep descriptions self-sufficient: essential scope must not depend on harness `triggers`, a name prefix, or index notes. Shared routing terms are valid; procedural summaries and repeated outcomes may be removable. When reviewing a changed description or proposing a discovery-cost finding, load `references/description-cost.md`. Require a concrete shorter alternative and preserved positive/near-miss routing before flagging avoidable cost; length alone is not a finding.
 
 If the user reports false positives or false negatives, recommend a trigger-eval set (~20 queries: 8–10 should-trigger + 8–10 near-miss should-not-trigger). Optionally store cases in `references/<evals>.json`.
 
@@ -77,4 +77,12 @@ Recommend skills include: do best-effort work before asking; batch questions int
 
 ## Q7. Token-tax awareness (informational)
 
-Estimate happy-path footprint = `SKILL.md` + most likely reference. If > ~3k tokens for the common case, recommend further splintering. Informational, not blocking.
+Keep three budgets separate:
+
+| Budget | Measure | What reduces it |
+|---|---|---|
+| Native discovery | Names + descriptions exposed by the host; report character estimates and the method | Remove unnecessary discovery text while preserving routing |
+| Activation | Loaded `SKILL.md`, unconditional dependencies, and references actually needed on this path | Prune unnecessary dependencies, deduplicate, gate optional detail |
+| Fallback lookup | Index content actually read; distinguish full-file bytes from observed reads | Targeted search or justified generated sub-indexes |
+
+Use `check.sh` estimates when available; configurable warnings are review signals, not universal runtime limits. Do not label characters or bytes as measured tokens. Splitting indexes does not shorten native descriptions. For activation above roughly 3k estimated tokens, inspect optional detail and dependencies; do not split a coherent workflow merely to meet a threshold. Keep findings scoped to changed skills. If aggregate discovery pressure needs a catalog-wide audit, hand the measurements to **skill-catalog-maintainer** without silently rewriting siblings.

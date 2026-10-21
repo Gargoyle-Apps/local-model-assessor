@@ -1,5 +1,5 @@
 # Skills harness kit metadata (optional; for humans and release notes)
-kit_version: "1.6.0"
+kit_version: "1.7.0"
 repo_url: "https://github.com/Gargoyle-Apps/skills-harness"
 native_targets:
   - .agents/skills

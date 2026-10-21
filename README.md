@@ -182,7 +182,7 @@ What model should I use for [vision tasks / creative writing / RAG / etc.]?
 
 ## Skills harness (third-party)
 
-The kit is vendored as a **git subtree** at [`.skills-harness/`](.skills-harness/) ([Gargoyle-Apps/skills-harness](https://github.com/Gargoyle-Apps/skills-harness), MIT, **v1.6.0**). Runtime layout:
+The kit is vendored as a **git subtree** at [`.skills-harness/`](.skills-harness/) ([Gargoyle-Apps/skills-harness](https://github.com/Gargoyle-Apps/skills-harness), MIT, **v1.7.0**). Runtime layout:
 
 - **`.skills-harness/`** — upstream kit (updated with `git subtree pull`; do not hand-edit)
 - **`.skills/`** — consumer tree: symlinked kit `_harness/` and bundled skills; **real directories** for repo-specific `lma-*` skills under `.skills/_skills/`
@@ -191,7 +191,7 @@ The kit is vendored as a **git subtree** at [`.skills-harness/`](.skills-harness
 
 Policy is **agnostic / multi-ecosystem** (Path B): see [AGENTS.md](AGENTS.md) **Skills (agnostic / multi-ecosystem)** — we do not merge tool-specific harness templates from `.skills/_harness/` into this project.
 
-**Update kit:** `git fetch skills-harness && git subtree pull --prefix=.skills-harness skills-harness main --squash` (or pin a release tag), then `.skills/_harness/migrate-to-subtree.sh --skip-subtree --reconcile --apply` and `.skills/_harness/check.sh --link` (see **harness-subtree** skill). **Credit:** shared templates and kit skills — contribute upstream; LMA skills stay in this repo.
+**Update kit:** `git fetch skills-harness --no-tags && git subtree pull --prefix=.skills-harness skills-harness main --squash` (or pin a release tag/SHA), read `.skills-harness/CHANGELOG.md`, then `.skills/_harness/migrate-to-subtree.sh --skip-subtree --reconcile --symlink-consumer-skills --apply`, `.skills/_harness/build-index.sh` (dry-run sync check), `.skills/_harness/check.sh --link`, `.skills/_harness/check.sh`, and `.skills/_harness/skill-conflicts.sh` (see **harness-subtree** skill). Generic `/review` stays host-led; **caveman-review** requires an explicit terse-review request. **Credit:** shared templates and kit skills — contribute upstream; LMA skills stay in this repo.
 
 ---
 

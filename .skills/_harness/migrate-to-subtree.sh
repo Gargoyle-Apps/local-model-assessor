@@ -24,9 +24,9 @@ set -euo pipefail
 #         declaration; consumer-owned fields otherwise stay put.
 #
 # Optional modes (each opt-in, each respects --apply gating):
-#   --reconcile                Merge upstream kit-skill rows into local
-#                              .skills/_index.md (kit names only — consumer
-#                              rows untouched) and bump .skills/_meta.yml
+#   --reconcile                Regenerate configured indexes from installed
+#                              local SKILL.md frontmatter (all generated rows)
+#                              and bump .skills/_meta.yml
 #                              kit_version/repo_url to match the subtree.
 #                              Use after a `git subtree pull` to finish the
 #                              update without hand-editing.
@@ -137,6 +137,11 @@ trim() {
   s="${s#"${s%%[![:space:]]*}"}"
   s="${s%"${s##*[![:space:]]}"}"
   printf '%s' "$s"
+}
+
+is_active_skill_name() {
+  case "$1" in _*|*.bak) return 1 ;; esac
+  return 0
 }
 
 note() { printf '%s\n' "$*"; }
@@ -307,8 +312,10 @@ fi
 KIT_SKILL_NAMES=""
 if [[ -n "$SUBTREE_SKILLS" && -d "$SUBTREE_SKILLS" ]]; then
   for d in "$SUBTREE_SKILLS"/*/; do
-    [[ -d "$d" ]] || continue
-    KIT_SKILL_NAMES="$KIT_SKILL_NAMES $(basename "$d")"
+    [[ -f "$d/SKILL.md" ]] || continue
+    name="$(basename "$d")"
+    is_active_skill_name "$name" || continue
+    KIT_SKILL_NAMES="$KIT_SKILL_NAMES $name"
   done
 else
   # Fallback for dry-run: known-bundled kit skills as of 0.6.0+.
@@ -446,9 +453,18 @@ refresh_kit_skill_link() {
     else
       if $APPLY; then
         rm "$local_path"
-        do_ "removed dangling symlink $local_path (target no longer in subtree)"
+        if [[ -d "$subtree_path" ]]; then
+          ln -s "$target_rel" "$local_path"
+          do_ "repaired dangling symlink $local_path -> $target_rel"
+        else
+          do_ "removed dangling symlink $local_path (target no longer in subtree)"
+        fi
       else
-        plan "remove dangling symlink $local_path (target $target_rel missing)"
+        if [[ -d "$subtree_path" ]]; then
+          plan "repair dangling symlink $local_path -> $target_rel"
+        else
+          plan "remove dangling symlink $local_path (target $target_rel missing)"
+        fi
       fi
     fi
     return
@@ -476,6 +492,23 @@ if $SKIP_SUBTREE; then
   note "Step: refresh kit-bundled skill symlinks (update mode)"
   for name in $KIT_SKILL_NAMES; do
     refresh_kit_skill_link "$name"
+  done
+  # Removed/renamed skills are absent from KIT_SKILL_NAMES. Only the exact
+  # per-name symlink installed by this script proves former kit ownership;
+  # a real directory, foreign link, or link to a different skill is untouched.
+  for old_link in .skills/_skills/*; do
+    [[ -L "$old_link" && ! -e "$old_link" ]] || continue
+    name="$(basename "$old_link")"
+    is_active_skill_name "$name" || continue
+    expected="../../$PREFIX/.skills/_skills/$name"
+    [[ "$(readlink "$old_link")" == "$expected" ]] || continue
+    [[ ! -d "$PREFIX/.skills/_skills/$name" ]] || continue
+    if $APPLY; then
+      rm "$old_link"
+      do_ "removed former kit symlink $old_link (upstream skill removed or renamed)"
+    else
+      plan "remove former kit symlink $old_link (upstream skill removed or renamed)"
+    fi
   done
   note ""
 fi
@@ -587,6 +620,7 @@ if [[ -d ".skills/_skills" ]]; then
   for d in .skills/_skills/*/; do
     [[ -d "$d" ]] || continue
     name="$(basename "$d")"
+    is_active_skill_name "$name" || continue
     [[ -L "${d%/}" ]] && continue
     if is_kit_skill "$name"; then continue; fi
 
@@ -595,10 +629,10 @@ if [[ -d ".skills/_skills" ]]; then
       if [[ -n "$DECLARED_PREFIXES" ]]; then
         warn "consumer skill '$name' does not start with any declared prefix ($ALLOWED_PREFIXES_DISPLAY)"
         warn "      → choose the family this skill belongs to and rename: <prefix>$name"
-        warn "        (also update SKILL.md frontmatter 'name' and .skills/_index.md)"
+        warn "        (also update SKILL.md frontmatter 'name', then run build-index.sh --write)"
       else
         warn "consumer skill '$name' is missing prefix '$DERIVED_PREFIX'"
-        warn "      → suggested rename: $DERIVED_PREFIX$name (also update SKILL.md frontmatter 'name' and .skills/_index.md)"
+        warn "      → suggested rename: $DERIVED_PREFIX$name (also update SKILL.md frontmatter 'name', then run build-index.sh --write)"
       fi
       prefix_violations=$((prefix_violations + 1))
     fi
@@ -616,6 +650,7 @@ if [[ -d ".skills/_skills" ]]; then
         if $in_fm; then closed=true; break; else in_fm=true; continue; fi
       fi
       $in_fm || continue
+      [[ "$line" == [[:space:]]* ]] && continue
       key="$(trim "$(printf '%s' "$line" | cut -d: -f1)")"
       for f in $REQUIRED_FIELDS; do
         if [[ "$key" == "$f" ]]; then
@@ -654,15 +689,10 @@ note "  frontmatter violations : $frontmatter_violations"
 
 # --- Step 6: --reconcile (gh issue #3, friction point 7) ----------------------
 #
-# Merge upstream kit-skill rows into the consumer's .skills/_index.md and bump
-# kit_version + repo_url in .skills/_meta.yml to match the subtree. Strategy:
-#   * Index: drop every row whose `name` (first cell) is in the kit-skill set,
-#     then append the upstream rows for those names. Consumer rows (those whose
-#     name is NOT in the kit-skill set) are passed through verbatim and keep
-#     their original position relative to the table header.
-#   * _meta.yml: rewrite the kit_version and repo_url lines in place. All other
-#     fields (role, prefixes, consumer_skills_dir, custom keys) are preserved.
-# Idempotent: running --reconcile twice produces the same output as once.
+# Local frontmatter owns all generated rows. Run the same generator used by
+# build-index/check after skill shims are installed. Preserve prose outside
+# managed tables/blocks and consumer metadata; upstream index wording/order
+# never overrides local skill frontmatter.
 
 reconcile_meta() {
   local upstream_meta="$PREFIX/.skills/_meta.yml"
@@ -719,121 +749,79 @@ reconcile_meta() {
 }
 
 reconcile_index() {
-  local upstream_index="$PREFIX/.skills/_index.md"
-  local local_index=".skills/_index.md"
-  if [[ ! -f "$upstream_index" ]]; then
-    warn "--reconcile: $upstream_index not found, skipping _index.md merge"
+  local status=0
+  local generator="$HARNESS_DIR/build-index.sh"
+  if [[ ! -f "$generator" ]]; then
+    if $APPLY; then
+      err "--reconcile: generator missing at $generator"
+      return 1
+    fi
+    warn "Index preview unavailable: generator missing at $generator."
+    warn "The installed legacy helper cannot predict generated rows; apply requires the vendored generator."
+    [[ -n "$SUBTREE_SKILLS" ]] || warn "Upstream additions, replacements, and metadata are unavailable before the subtree is vendored."
+    plan "regenerate configured indexes after installing the upstream harness and planned skill shims"
     return 0
   fi
-  if [[ ! -f "$local_index" ]]; then
-    warn "--reconcile: $local_index not found, skipping merge"
-    return 0
-  fi
-
-  # Build the set of kit-skill names from $KIT_SKILL_NAMES (already populated above).
-  is_kit() {
-    local n="$1" k
-    for k in $KIT_SKILL_NAMES; do
-      [[ "$n" == "$k" ]] && return 0
-    done
-    return 1
-  }
-
-  # Walk both files and produce the merged output:
-  #   1. Pass through every line of local_index, dropping any data row whose
-  #      first cell (after `| `) is in the kit set.
-  #   2. After processing, append upstream's kit rows in the order they appear
-  #      upstream. (We append rather than insert at original position because
-  #      kit rows in a stale local index may not be in canonical order; this
-  #      gives a deterministic, idempotent result.)
-  local tmp
-  tmp="$(mktemp)"
-  local in_table_body=false kit_rows_appended=false dropped=0 added=0
-
-  append_kit_rows() {
-    if $kit_rows_appended || [[ -z "$up_kit_rows" ]]; then
-      return 0
-    fi
-    while IFS= read -r kr; do
-      [[ -z "$kr" ]] && continue
-      printf '%s\n' "$kr" >> "$tmp"
-      added=$((added + 1))
-    done <<< "$up_kit_rows"
-    kit_rows_appended=true
-  }
-
-  # Extract kit rows from upstream before walking the local file.
-  local up_kit_rows
-  up_kit_rows="$(awk -v kit_set="|$(echo "$KIT_SKILL_NAMES" | tr ' ' '|')|" '
-    /^\|[[:space:]-]+\|/ { in_body=1; next }
-    in_body && /^\|/ {
-      n=$0
-      sub(/^\|[[:space:]]*/, "", n)
-      sub(/[[:space:]]*\|.*/, "", n)
-      if (kit_set ~ "\\|" n "\\|") print
-    }
-  ' "$upstream_index")"
-
-  while IFS= read -r line || [[ -n "$line" ]]; do
-    if [[ "$line" =~ ^\|[[:space:]-]+\| ]]; then
-      in_table_body=true
-      printf '%s\n' "$line" >> "$tmp"
-      continue
-    fi
-
-    if $in_table_body && [[ "$line" =~ ^\|[[:space:]]*([a-zA-Z0-9_-]+)[[:space:]]*\| ]]; then
-      row_name="${BASH_REMATCH[1]}"
-      if is_kit "$row_name"; then
-        dropped=$((dropped + 1))
-        continue
-      fi
-      printf '%s\n' "$line" >> "$tmp"
-      continue
-    fi
-
-    if $in_table_body && [[ "$line" != \|* ]]; then
-      append_kit_rows
-      in_table_body=false
-    fi
-
-    printf '%s\n' "$line" >> "$tmp"
-  done < "$local_index"
-
-  if $in_table_body; then
-    append_kit_rows
-  fi
-
-  if ! $APPLY; then
-    # Compare the would-be result to the live file, not just dropped/added
-    # counts: a drop+add of byte-identical rows produces an unchanged file,
-    # and we want dry-run to honour the same "ok already matches" promise as
-    # apply-mode (the cmp below).
-    if cmp -s "$tmp" "$local_index"; then
-      note "  ok    .skills/_index.md kit rows already match upstream (no merge needed)"
-    else
-      plan ".skills/_index.md: drop $dropped stale kit rows, add $added current kit rows"
-    fi
-    rm -f "$tmp"
-    return 0
-  fi
-
-  # Compare; only overwrite if changed (keeps mtime stable when idempotent).
-  if cmp -s "$tmp" "$local_index"; then
-    note "  ok    .skills/_index.md kit rows already match upstream"
-    rm -f "$tmp"
+  if $APPLY; then
+    SKILLS_HARNESS_DIR="$HARNESS_DIR" SKILLS_DIR="$REPO_ROOT/.skills/_skills" \
+      SKILLS_INDEX="$REPO_ROOT/.skills/_index.md" SKILLS_META="$REPO_ROOT/.skills/_meta.yml" \
+      bash "$generator" --write || return $?
   else
-    preserve_mode_mv "$tmp" "$local_index"
-    do_ ".skills/_index.md merged: dropped $dropped stale kit rows, added $added current kit rows"
+    if [[ -z "$SUBTREE_SKILLS" ]]; then
+      note "  Partial index preview: upstream additions and replacements are unavailable before the subtree is vendored."
+      note "  Rows below use installed sources only; --force/--accept-upstream replacements cannot be projected yet."
+    fi
+    # Project planned additions into a temporary directory of source links;
+    # this previews their rows without mutating the consumer working tree.
+    preview_index() (
+      local preview src name
+      preview="$(mktemp -d)"
+      trap 'rm -rf "$preview"' EXIT
+      trap 'exit 2' HUP INT TERM
+      for src in "$REPO_ROOT/.skills/_skills"/*/; do
+        [[ -d "$src" ]] || continue
+        name="$(basename "$src")"
+        is_active_skill_name "$name" || continue
+        ln -s "$(cd "$src" && pwd -P)" "$preview/$name"
+      done
+      if [[ -n "$SUBTREE_SKILLS" ]]; then
+        for src in "$SUBTREE_SKILLS"/*/; do
+          [[ -f "$src/SKILL.md" ]] || continue
+          name="$(basename "$src")"
+          is_active_skill_name "$name" || continue
+          [[ -e "$preview/$name" || -e "$REPO_ROOT/.skills/_skills/$name" ]] && continue
+          # Update-mode repairs a dangling shim when its upstream source
+          # exists, so the repaired source contributes rows immediately.
+          ln -s "$(cd "$src" && pwd -P)" "$preview/$name"
+        done
+      fi
+      if $SYMLINK_CONSUMER_SKILLS && [[ -n "$CONSUMER_SKILLS_DIR" ]]; then
+        for src in "$CONSUMER_SKILLS_DIR"/*/; do
+          [[ -f "$src/SKILL.md" ]] || continue
+          name="$(basename "$src")"
+          is_active_skill_name "$name" || continue
+          is_kit_skill "$name" && continue
+          if [[ -L "$REPO_ROOT/.skills/_skills/$name" ]]; then
+            # Consumer refresh retargets existing symlinks, including ones
+            # that still resolve to a different source with stale wording.
+            [[ ! -L "$preview/$name" ]] || rm "$preview/$name"
+            ln -s "$(cd "$src" && pwd -P)" "$preview/$name"
+            continue
+          fi
+          [[ -e "$preview/$name" || -e "$REPO_ROOT/.skills/_skills/$name" ]] && continue
+          ln -s "$(cd "$src" && pwd -P)" "$preview/$name"
+        done
+      fi
+      SKILLS_HARNESS_DIR="$HARNESS_DIR" SKILLS_DIR="$preview" \
+        SKILLS_INDEX="$REPO_ROOT/.skills/_index.md" SKILLS_META="$REPO_ROOT/.skills/_meta.yml" \
+        bash "$generator" --dry-run
+    )
+    preview_index || status=$?
+    # Drift is the expected preview result; malformed layouts remain errors.
+    (( status <= 1 )) || return "$status"
+    [[ -n "$SUBTREE_SKILLS" ]] || note "  New upstream skills can only be previewed once the subtree is vendored."
   fi
-  return 0
 }
-
-if $RECONCILE; then
-  note "Step: --reconcile  (writes to .skills/_index.md and .skills/_meta.yml)"
-  reconcile_meta
-  reconcile_index
-  note ""
-fi
 
 # --- Step 7: --symlink-consumer-skills (gh issue #3, friction point 8) --------
 #
@@ -854,7 +842,7 @@ symlink_consumer_skills() {
     return 0
   fi
 
-  mkdir -p .skills/_skills
+  if $APPLY; then mkdir -p .skills/_skills; fi
 
   # Relative depth from .skills/_skills/<name> back to repo root is "../../",
   # so the symlink target is "../../<consumer_skills_dir>/<name>". This depth
@@ -866,6 +854,7 @@ symlink_consumer_skills() {
     [[ -d "$src" ]] || continue
     local name
     name="$(basename "$src")"
+    is_active_skill_name "$name" || continue
 
     if is_kit_skill "$name"; then
       skipped_kit=$((skipped_kit + 1))
@@ -923,6 +912,14 @@ if $SYMLINK_CONSUMER_SKILLS; then
   note ""
 fi
 
+# Generate after new consumer shims exist, so one apply leaves a complete index.
+if $RECONCILE; then
+  note "Step: --reconcile (generate indexes from local frontmatter; update kit metadata)"
+  reconcile_index
+  reconcile_meta
+  note ""
+fi
+
 # --- Step 8: create/sync persisted native discovery targets ------------------
 
 declared_native_targets() {
@@ -970,7 +967,7 @@ elif $RECONCILE || $SYMLINK_CONSUMER_SKILLS; then
   note "Reconcile / symlink steps complete. Other reminders:"
 else
   note "Step: manual reconcile (or re-run with --reconcile to automate this)"
-  note "  1. .skills/_index.md  — merge new kit-skill rows from $PREFIX/.skills/_index.md"
+  note "  1. .skills/_index.md  — regenerate from installed skill frontmatter with build-index.sh --write"
   note "  2. .skills/_meta.yml  — bump kit_version to match $PREFIX/.skills/_meta.yml"
   note "       Both of the above can be done with: --reconcile --apply"
 fi

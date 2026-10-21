@@ -9,7 +9,7 @@ triggers:
   - enable IDE symlinks
   - update skills system
 dependencies: []
-version: "1.2.0"
+version: "1.3.0"
 ---
 
 # Harness Upgrade
@@ -29,7 +29,7 @@ Load when upgrading a repo's skills-harness from an older version (pre-0.4.0) to
 
 ### 1. Check current version
 
-Read `.skills/_meta.yml` and note `kit_version`. If it is already 0.4.0 or later, skip to step 3 (enable native discovery only).
+Read `.skills/_meta.yml` and note `kit_version`. For a kit upgrade, continue to step 2 even if native discovery already exists. Skip to step 3 only when the installed kit is already the requested version and the task is to enable or repair discovery.
 
 ### 2. Update harness files
 
@@ -37,12 +37,10 @@ Copy these from the latest [skills-harness](https://github.com/Gargoyle-Apps/ski
 
 | Source | Destination | Notes |
 |--------|-------------|-------|
-| `.skills/_harness/link.sh` | `.skills/_harness/link.sh` | New — symlink helper |
-| `.skills/_harness/check.sh` | `.skills/_harness/check.sh` | Updated — adds symlink validation |
-| `.skills/_harness/*_template.md` | `.skills/_harness/*_template.md` | Updated — SETUP now includes native discovery step |
+| `.skills/_harness/` | `.skills/_harness/` | Update the complete kit-owned tree, including scripts, `validate-optional-frontmatter.awk`, rules, templates, layout documentation, and tests; preserve unowned consumer files and review local customizations |
 | `.skills/_meta.yml` | `.skills/_meta.yml` | Merge `kit_version`, `repo_url`, and `native_targets`; preserve consumer fields |
 
-Do **not** replace `.skills/_index.md` or the entire `.skills/_skills/` directory — those contain consumer-owned content. To pick up **new** bundled skills from upstream (e.g. `harness-upgrade`), copy the specific skill directory into `.skills/_skills/` and add its row to `.skills/_index.md`.
+Do **not** replace `.skills/_index.md` or the entire `.skills/_skills/` directory — those contain consumer-owned content. To pick up **new** bundled skills from upstream (e.g. `harness-upgrade`), copy the specific skill directory into `.skills/_skills/`, then run `.skills/_harness/build-index.sh --write`. All rows come from local frontmatter. This also updates optional split indexes; see `.skills/_harness/index-layout.md` for configuration and ownership.
 
 ### 3. Enable native discovery
 

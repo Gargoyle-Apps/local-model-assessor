@@ -24,6 +24,8 @@ mkdir -p "$fixture/.skills/_harness" "$fixture/.skills/_skills/example" \
   "$fixture/.skills/_skills/cycle-a" "$fixture/.skills/_skills/cycle-b"
 cp "$repo_root/.skills/_harness/check.sh" "$fixture/.skills/_harness/check.sh"
 cp "$repo_root/.skills/_harness/link.sh" "$fixture/.skills/_harness/link.sh"
+cp "$repo_root/.skills/_harness/build-index.sh" "$fixture/.skills/_harness/build-index.sh"
+cp "$repo_root/.skills/_harness/validate-optional-frontmatter.awk" "$fixture/.skills/_harness/validate-optional-frontmatter.awk"
 cp "$repo_root/.skills/_harness/_rules.md" "$fixture/.skills/_harness/_rules.md"
 chmod +x "$fixture/.skills/_harness/check.sh" "$fixture/.skills/_harness/link.sh"
 
@@ -80,6 +82,7 @@ cat > "$fixture/.skills/_index.md" <<'EOF'
 | cycle-a | Exercises dependency cycle detection. | cycle a smoke | `.skills/_skills/cycle-a/SKILL.md` |
 | cycle-b | Completes the dependency cycle. | cycle b smoke | `.skills/_skills/cycle-b/SKILL.md` |
 EOF
+/bin/bash "$fixture/.skills/_harness/build-index.sh" --write > "$test_root/build-index.out"
 
 cat > "$fixture/.skills/_meta.yml" <<'EOF'
 kit_version: "0.0.0"
@@ -162,6 +165,7 @@ mkdir -p "$migration/.skills/_harness" "$migration/.skills/_skills" \
   "$migration/.skills-harness/.skills/_skills/kit-demo"
 cp "$repo_root/.skills/_harness/migrate-to-subtree.sh" "$migration/.skills/_harness/migrate-to-subtree.sh"
 cp "$repo_root/.skills/_harness/link.sh" "$migration/.skills/_harness/link.sh"
+cp "$repo_root/.skills/_harness/build-index.sh" "$migration/.skills/_harness/build-index.sh"
 chmod +x "$migration/.skills/_harness/migrate-to-subtree.sh" "$migration/.skills/_harness/link.sh"
 cat > "$migration/.skills/_meta.yml" <<'EOF'
 kit_version: "0.0.0"
@@ -289,5 +293,11 @@ fi
 grep -q 'codex:skills:legacy/example' "$conflict_output" \
   || fail "legacy Codex conflict identifies legacy surface"
 pass "legacy Codex conflicts remain visible during migration"
+
+/bin/bash "$script_dir/deploy-uninstall.sh"
+/bin/bash "$script_dir/optional-frontmatter.sh"
+/bin/bash "$script_dir/indexes.sh"
+/bin/bash "$script_dir/migration-review.sh"
+/bin/bash "$script_dir/pipeline-review.sh"
 
 printf 'All smoke tests passed.\n'

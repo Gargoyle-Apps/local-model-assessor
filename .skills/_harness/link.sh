@@ -182,9 +182,9 @@ for skill_dir in "$SKILLS_DIR"/*/; do
   [ ! -d "$skill_dir" ] && continue
   name="$(basename "$skill_dir")"
 
-  # Skip _-prefixed directories (harness internal)
+  # Harness internals and migration backups are not discoverable skills.
   case "$name" in
-    _*) continue ;;
+    _*|*.bak) continue ;;
   esac
 
   target_link="$TARGET_ABS/$name"
@@ -212,6 +212,22 @@ for skill_dir in "$SKILLS_DIR"/*/; do
   ln -s "$expected_target" "$target_link"
   echo "  linked  $TARGET_REL/$name"
   linked=$((linked + 1))
+done
+
+# Remove inactive links created by older helpers, without touching the backup
+# source, real native entries, or foreign links with a similar name.
+for item in "$TARGET_ABS"/*; do
+  [ -L "$item" ] || continue
+  name="$(basename "$item")"
+  case "$name" in
+    _*|*.bak)
+      if [ "$(readlink "$item")" = "$REL_SKILLS/$name" ]; then
+        rm -f "$item"
+        echo "  pruned  $TARGET_REL/$name (inactive backup/internal directory)"
+        pruned=$((pruned + 1))
+      fi
+      ;;
+  esac
 done
 
 # Prune dangling symlinks (targets that no longer exist)

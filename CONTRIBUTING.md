@@ -37,6 +37,8 @@ Follow the bundled **skill-author** skill (`.skills/_skills/skill-author/SKILL.m
 
 Kit-bundled skills ship unprefixed (`skill-author`, `skill-reviewer`, `harness-subtree`, …). See [`.skills/_index.md`](.skills/_index.md) for the full list.
 
+Generate catalog rows only from installed skill frontmatter. The default is one table; optional split layouts and their ownership/migration rules are documented in [index-layout.md](.skills/_harness/index-layout.md). Use `build-index.sh --dry-run` before a layout change and `--write` after approval. Do not hand-edit generated rows or links. Reconciliation invokes the same generator; preserve human-authored routing prose outside generated blocks.
+
 New or changed skills with bundled scripts should pass **skill-reviewer** before merge. Consumer repos may document optional `upstream:` frontmatter on imported skills — see **skill-import**.
 
 ## Testing
@@ -53,7 +55,7 @@ Use the validation script, zero-dependency smoke suite, and targeted manual test
   - Dependency target/cycle and context-health warnings (transitive bodies, native metadata, index growth, skill size)
   - Use **`check.sh --link`** or **`SKILLS_AUTO_LINK=1`** to create/sync all declared native targets before validating
 
-- **Smoke suite** — run `/bin/bash .skills/_harness/tests/smoke.sh`. It covers declared-target creation, missing-target failure, the undeclared empty-target path under macOS Bash 3.2, dependency diagnostics, subtree migration sync, clean Cursor single-surface setup, Codex's current and legacy user-skill paths, and legacy Codex conflict scanning.
+- **Smoke suite** — run `PATH=/usr/bin:/bin:/usr/sbin:/sbin /bin/bash .skills/_harness/tests/smoke.sh` to keep nested shell invocations on macOS Bash 3.2. It covers declared-target creation, missing-target failure, the undeclared empty-target path, dependency diagnostics, subtree migration sync, clean Cursor single-surface setup, Codex's current and legacy user-skill paths, and legacy Codex conflict scanning. It also runs standalone `tests/indexes.sh`, `tests/optional-frontmatter.sh`, `tests/deploy-uninstall.sh`, `tests/migration-review.sh`, and `tests/pipeline-review.sh` for catalog generation/reconciliation, optional field contracts, managed dangling-link removal, upstream removal, backup exclusion, and quiet diagnostics.
 
 - **Manual smoke test** (before a release):
   1. Create a fresh temp directory; copy `AGENTS_skills.md` and `.skills/` into it.
@@ -91,6 +93,10 @@ Harness-specific fields (`triggers`, `dependencies`, `version`) are recommended 
 | `triggers` | harness only | Phrases that cause the harness to load the skill |
 | `dependencies` | harness only | Other skills to load first |
 | `version` | harness only | Semver for humans |
+| `compatibility` | optional Agent Skills field | Environment requirements, 1–500 characters when present |
+| `metadata` | optional Agent Skills field | Flat string-to-string annotations, including advisory `family` |
+
+Descriptions must carry their own selection criteria, including relevant near-miss exclusions. Harness `triggers`, prefixes, and index notes cannot supply essential scope omitted from descriptions. Prefixes describe ownership/deployment. Optional fields are preserved in frontmatter; `_meta.yml` controls index grouping, and `metadata.family` does not override it. See **skill-template** for the validator's single-line scalar and flat block/flow map syntax.
 
 ## Environment overrides
 
@@ -111,7 +117,7 @@ Both `check.sh`, `link.sh`, and `skill-conflicts.sh` derive paths from their own
 | `SKILLS_INDEX_WARN_BYTES` | check | `12000` bytes |
 | `SKILLS_SKILL_LARGE_LINES` / `SKILLS_SKILL_SPLIT_LINES` | check | `180` / `350` lines |
 
-`check.sh` also accepts `--quiet` (suppress success footer) and `--link` (create/sync every declared native target).
+`check.sh` also accepts `--quiet` (suppress success output while retaining warnings and failure diagnostics) and `--link` (create/sync every declared native target).
 
 ## Symlink helper (`link.sh`)
 

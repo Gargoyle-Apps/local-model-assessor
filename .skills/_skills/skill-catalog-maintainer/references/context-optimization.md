@@ -30,7 +30,7 @@ Use ordinary `check.sh` defaults for pass/fail judgment; zero thresholds above o
 1. Record baseline direct bytes/lines and all `check.sh` context warnings.
 2. Tighten routing metadata:
    - Keep `description` focused on what the skill does and when it loads.
-   - Remove wording duplicated by `triggers`; retain terms needed for native matching.
+   - Remove procedural detail and repeated outcomes; keep descriptions self-sufficient without harness `triggers`, prefixes, or index notes. Shared routing terms are valid.
    - Keep natural trigger phrases and update trigger evals, including near misses.
 3. Prune dependency cost:
    - Keep only companions needed on every invocation in `dependencies`.

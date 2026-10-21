@@ -12,7 +12,7 @@ triggers:
   - condense this skill
   - trim skill tokens
 dependencies: []
-version: "1.2.1"
+version: "1.3.0"
 ---
 
 # Skill Catalog Maintainer
@@ -27,7 +27,8 @@ By default, skills describe workflows; they do not edit sibling skills. **This s
 
 - Other skills' `SKILL.md` — frontmatter (`description`, `triggers`, `dependencies`, `version`) and body
 - Other skills' `references/` — add or edit gated prose extracted from `SKILL.md`; do not change scripts or assets
-- `.skills/_index.md` — via `build-index.sh --write` after frontmatter changes
+- `.skills/_index.md` and configured generated child indexes — only via `build-index.sh --write` after approved frontmatter or layout changes; preserve consumer-owned prose
+- `.skills/_meta.yml` — only `index_layout` and `index_fallback` for an approved catalog migration; reuse existing prefix declarations and preserve other settings
 - Root `AGENTS.md` — Skills / harness policy sections when catalog conventions change
 
 **Required guardrails:**
@@ -84,6 +85,8 @@ Derive a 5–8 word intent label from each `description`. Group skills with over
 If most prose already lives in `references/`, say so.
 
 When a skill or dependency chain needs reduction, read [references/context-optimization.md](references/context-optimization.md). Preserve routing, behavior, safety gates, and exact commands; passing a size threshold alone is not success.
+
+When navigation complaints, index warnings, new families, or catalog growth warrant investigation, load [references/index-assessment.md](references/index-assessment.md). Reuse this audit's inventory and measurements; keep the assessment read-only. Use [references/index-assessment-evals.json](references/index-assessment-evals.json) when evaluating its decisions. No fixed skill count or file size requires a split.
 
 ### 6. Deliver the report
 

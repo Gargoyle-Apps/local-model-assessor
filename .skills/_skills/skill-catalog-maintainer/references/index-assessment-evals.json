@@ -1,0 +1,115 @@
+{
+  "schema_version": "1.0",
+  "purpose": "Assessment fixtures; hide expected outcomes during evaluation. These are not executed results.",
+  "cases": [
+    {
+      "id": "persistent-fallback-pressure",
+      "prompt": "Our sampled fallback tasks still load unrelated catalog content after trying targeted search. Should we split?",
+      "evidence": {
+        "routing_misses": "0 of 8 sampled tasks; preserve this result",
+        "whole_index_reads": "8 of 8 baseline reads; targeted search still required 6 whole-index reads to interpret local routing notes",
+        "family_growth": "Three independently maintained families with growing local notes; two cross-family tasks in the sample",
+        "native_discovery": "Unchanged; no native pressure reported",
+        "tooling": "Installed generator cannot generate or reconcile child indexes"
+      },
+      "expected": {
+        "outcome": "propose-generated-sub-indexes",
+        "actions": [
+          "Reuse inventory and observed reads",
+          "Propose small root, generated children, ownership and cross-family notes",
+          "Estimate savings and require same-case validation",
+          "Hand unsupported tooling to #21; retain read-only assessment"
+        ],
+        "must_not": [
+          "Write child indexes",
+          "Claim measured savings for an untested layout",
+          "Force family-first native routing"
+        ]
+      }
+    },
+    {
+      "id": "native-only-pressure",
+      "prompt": "Our native description estimate exceeds the warning. Would sub-indexes reduce it?",
+      "evidence": {
+        "routing_misses": "None observed in sampled tasks",
+        "whole_index_reads": "No fallback reads in sampled tasks",
+        "family_growth": "No independent growth evidence",
+        "native_discovery": "Estimated names and descriptions exceed configured warning"
+      },
+      "expected": {
+        "outcome": "keep-one-index",
+        "actions": [
+          "Explain sub-indexes do not reduce native descriptions",
+          "Offer measured description-cost audit with routing preservation"
+        ],
+        "must_not": [
+          "Recommend splitting from native pressure",
+          "Automatically shorten descriptions"
+        ]
+      }
+    },
+    {
+      "id": "large-efficient-catalog",
+      "prompt": "Our catalog is large and keeps growing. Should it be split?",
+      "evidence": {
+        "routing_misses": "0 of 8 representative tasks",
+        "whole_index_reads": "0 of 8; targeted lookups read only relevant rows",
+        "family_growth": "Several families; cross-family tasks route correctly",
+        "native_discovery": "No measured concern"
+      },
+      "expected": {
+        "outcome": "keep-one-index",
+        "actions": [
+          "Use observed efficient lookup as evidence",
+          "Retain coverage and cross-family routing"
+        ],
+        "must_not": [
+          "Split based on count or bytes",
+          "Require family-first native lookup"
+        ]
+      }
+    },
+    {
+      "id": "small-correctable-ambiguity",
+      "prompt": "Two skills in our small catalog repeatedly get confused. Do we need sub-indexes?",
+      "evidence": {
+        "routing_misses": "Three prompts select backup creation when staging restore is expected; descriptions only say database helper",
+        "whole_index_reads": "No repeated full reads observed",
+        "family_growth": "No independent families"
+      },
+      "expected": {
+        "outcome": "improve-descriptions-or-lookup",
+        "actions": [
+          "Propose explicit backup creation versus staging restore descriptions",
+          "Replay positive and near-miss prompts before reconsidering structure"
+        ],
+        "must_not": [
+          "Split before repairing known description ambiguity",
+          "Assume small catalogs cannot have structural problems"
+        ]
+      }
+    },
+    {
+      "id": "unknown-read-behavior",
+      "prompt": "The fallback index grew and people say it feels unwieldy. Assess sub-indexes.",
+      "evidence": {
+        "routing_misses": "Unknown; no prompts or selected skills recorded",
+        "whole_index_reads": "Unknown; no read trace",
+        "family_growth": "New prefixes reported, but no membership or cross-family evidence"
+      },
+      "expected": {
+        "outcome": "keep-one-index-provisionally",
+        "actions": [
+          "Mark missing evidence unknown",
+          "Propose bounded prompt/read evaluation with targeted-search comparison",
+          "Reuse inventory instead of repeating audit"
+        ],
+        "must_not": [
+          "Treat file size as observed read cost",
+          "Infer independent families solely from prefixes",
+          "Migrate automatically"
+        ]
+      }
+    }
+  ]
+}

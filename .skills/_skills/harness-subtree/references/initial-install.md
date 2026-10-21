@@ -30,7 +30,7 @@ First-time subtree install in a consumer repo (no existing `.skills-harness/`).
    done
    ```
 
-4. **Seed `.skills/_index.md`** by copying the upstream index, then leave room for your own rows:
+4. **Seed `.skills/_index.md`** by copying the upstream index. Future rows are generated from local skill frontmatter:
 
    ```bash
    cp .skills-harness/.skills/_index.md .skills/_index.md

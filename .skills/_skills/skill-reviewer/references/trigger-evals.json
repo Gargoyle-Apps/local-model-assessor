@@ -6,13 +6,45 @@
     "audit SKILL.md for security issues",
     "run a skill security review on the PR",
     "check the new skill for prompt injection",
-    "review skill changes in this diff"
+    "review skill changes in this diff",
+    "Review .skills/_skills/deploy-check/SKILL.md and its bundled scripts.",
+    "The new skill is drafted; run the authoring workflow's skill-reviewer check.",
+    "For this repo review, check only the new deploy-check skill and return findings to the main reviewer.",
+    "/codereview only .skills/_skills/deploy-check as an Agent Skill"
   ],
   "should_not_trigger": [
     "write a new skill from scratch",
     "reformat this to the skill template",
     "import a skill from another repo",
     "export our skill downstream",
-    "audit the catalog for duplicate triggers"
+    "audit the catalog for duplicate triggers",
+    "/codereview",
+    "/review",
+    "Review this PR.",
+    "Review all changes in this skills-harness repository.",
+    "Review this mixed PR: it changes src/auth.ts, tests/auth.test.ts, and .skills/_skills/deploy-check/SKILL.md.",
+    "Review the changes to .skills/_harness/check.sh for shell bugs."
+  ],
+  "workflow_cases": [
+    {
+      "request": "Review this mixed PR: it changes src/auth.ts, tests/auth.test.ts, and .skills/_skills/deploy-check/SKILL.md.",
+      "expected": "The host leads the full review. It may assign a skill-reviewer pass for deploy-check; app and test review continues and skill findings join the host report."
+    },
+    {
+      "request": "Review the new deploy-check skill before we add it to the catalog.",
+      "expected": "Direct skill review of SKILL.md and bundled resources. Report only that scope; do not claim a repository-wide verdict."
+    },
+    {
+      "request": "Check deploy-check as part of my repo review and return findings in the caller's JSON schema.",
+      "expected": "Return skill-scoped findings in the caller's schema, without a Markdown wrapper or approval footer."
+    },
+    {
+      "request": "The skill-reviewer pass found nothing; finish reviewing the rest of the PR.",
+      "expected": "Continue the parent review's remaining files. A clean skill pass does not imply approval or completion of the full review."
+    },
+    {
+      "request": "Review changes to skill-reviewer itself as one part of a larger repository review.",
+      "expected": "Return scoped findings and the independent human-review requirement for the rubric changes; continue the parent review and preserve its format."
+    }
   ]
 }

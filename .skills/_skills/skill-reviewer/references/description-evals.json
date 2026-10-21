@@ -1,0 +1,73 @@
+{
+  "schema_version": "1.0",
+  "purpose": "Description-only routing fixtures; expected outcomes are not executed eval results. Hide labels when running.",
+  "examples": [
+    {
+      "id": "shortened",
+      "before": "Reviews deployment configuration changes for Kubernetes services. Use when reviewing a Kubernetes deployment diff. Reads manifests, checks resource requests, examines probes, compares replica settings, and reports deployment risks with suggested fixes.",
+      "after": "Reviews Kubernetes deployment configuration diffs for deployment risks. Use when reviewing changes to Kubernetes service manifests.",
+      "cases": [
+        {
+          "prompt": "Review this Kubernetes deployment manifest diff for risks.",
+          "should_trigger": true
+        },
+        {
+          "prompt": "Review this Docker Compose service diff.",
+          "should_trigger": false
+        },
+        {
+          "prompt": "Deploy the approved Kubernetes release now.",
+          "should_trigger": false
+        }
+      ],
+      "before_chars": 252,
+      "after_chars": 131
+    },
+    {
+      "id": "necessary-long",
+      "before": "Previews restoration of PostgreSQL backups in a disposable staging database and, after explicit confirmation, performs that restore. Use when testing backup recoverability in staging. Requires a disposable PostgreSQL staging target; excludes production recovery, backup creation, and database migration planning.",
+      "after": null,
+      "cases": [
+        {
+          "prompt": "Test whether this PostgreSQL backup restores to our disposable staging database.",
+          "should_trigger": true
+        },
+        {
+          "prompt": "Restore this PostgreSQL backup over the production database.",
+          "should_trigger": false
+        },
+        {
+          "prompt": "Create tonight's PostgreSQL backup.",
+          "should_trigger": false
+        },
+        {
+          "prompt": "Plan our PostgreSQL schema migration.",
+          "should_trigger": false
+        }
+      ],
+      "before_chars": 312,
+      "after_chars": null
+    },
+    {
+      "id": "overcompressed",
+      "before": "Previews restoration of PostgreSQL backups in a disposable staging database and, after explicit confirmation, performs that restore. Use when testing backup recoverability in staging. Requires a disposable PostgreSQL staging target; excludes production recovery, backup creation, and database migration planning.",
+      "after": "Restores database backups. Use for recovery.",
+      "cases": [
+        {
+          "prompt": "Test whether this PostgreSQL backup restores to our disposable staging database.",
+          "should_trigger": true
+        },
+        {
+          "prompt": "Recover our production MySQL database from backup.",
+          "should_trigger": false
+        },
+        {
+          "prompt": "Restore the production PostgreSQL database immediately.",
+          "should_trigger": false
+        }
+      ],
+      "before_chars": 312,
+      "after_chars": 44
+    }
+  ]
+}

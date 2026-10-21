@@ -128,21 +128,25 @@ run() {
 
 resolve_symlink_target() {
   local link="$1"
-  local target
-  target="$(readlink "$link")"
+  local target parent
+  target="$(readlink "$link")" || return 1
   if [[ "$target" != /* ]]; then
-    target="$(cd "$(dirname "$link")" && pwd)/$target"
+    parent="$(cd "$(dirname "$link")" && pwd -P)" || return 1
+    target="$parent/$target"
   fi
-  target="$(cd "$(dirname "$target")" 2>/dev/null && pwd -P)/$(basename "$target")"
-  printf '%s' "$target"
+  # Resolve parent aliases, but do not require the final skill to still exist.
+  parent="$(cd "$(dirname "$target")" 2>/dev/null && pwd -P)" || return 1
+  printf '%s/%s' "$parent" "$(basename "$target")"
 }
 
 is_managed_skill_dest() {
   local dest="$1" name="$2"
   [[ -L "$dest" ]] || return 1
   local resolved expected
-  resolved="$(resolve_symlink_target "$dest")"
-  expected="$(cd "$SKILLS_ROOT/$name" && pwd -P)"
+  resolved="$(resolve_symlink_target "$dest")" || return 1
+  # SKILLS_ROOT is already physical; compare the stored path, including when
+  # this checkout's source skill was deleted or renamed after deployment.
+  expected="$SKILLS_ROOT/$name"
   [[ "$resolved" == "$expected" ]]
 }
 

@@ -2,7 +2,7 @@
 
 Use when a repo already has `.skills/` (installed by file-copy from an earlier kit version) and you want to switch to subtree-vendored updates **without losing consumer-authored skills, the index, or `_meta.yml`**.
 
-The kit ships a helper: **`.skills/_harness/migrate-to-subtree.sh`**. It is **dry-run by default** — it inventories the repo, classifies each skill as kit-bundled vs. consumer-authored, and prints exactly what it would change. Re-run with `--apply` to perform the changes.
+The kit ships a helper: **`.skills/_harness/migrate-to-subtree.sh`**. It is **dry-run by default** — it inventories the repo, classifies each skill as kit-bundled vs. consumer-authored, and previews changes using available sources. Before the subtree is vendored, upstream contents are unavailable; a stale install may also lack the index generator. The preview reports these limits and continues with the remaining plans. Re-run with `--apply` to perform the changes.
 
 ## Bootstrapping the script on a stale install
 
@@ -45,14 +45,22 @@ The standard fix when adopting the official upstream:
 ## What it never touches
 
 - **Consumer-authored skills** (any directory under `.skills/_skills/` whose name is not in the kit-bundled set) — left exactly as they are.
-- **`.skills/_index.md`** and **`.skills/_meta.yml`** — consumer-owned. By default the script prints a reconcile checklist instead of editing them. Pass **`--reconcile`** to opt in to automated kit-row merge + `kit_version`/`repo_url` bump (consumer rows and other `_meta.yml` fields stay verbatim). Passing **`--native-target`** may add only the requested `native_targets` entry to `_meta.yml`.
+- **Configured indexes and `.skills/_meta.yml`** — consumer-owned. By default the script prints a reconcile checklist instead of editing them. Pass **`--reconcile`** to regenerate all rows from installed local frontmatter and bump `kit_version`/`repo_url`; routing prose outside generated tables/blocks and other metadata fields stay intact. See `.skills/_harness/index-layout.md` for optional split indexes. Passing **`--native-target`** may add only the requested `native_targets` entry to `_meta.yml`.
 - **Native discovery symlink directories** (`.agents/skills/`, `.claude/skills/`) unless `--native-target` is supplied or `native_targets:` is already declared. In those cases migration creates/syncs the declared targets without touching unrelated entries.
 
 ## What it audits (warns, never modifies)
 
 - **Prefix convention** (per **skill-author**): for every consumer-authored skill, the script checks the name against the repo's allowed prefix set:
   - **Default (single-prefix repos):** the expected prefix is derived from the repo's root directory name (split on `-`/`_`, first letter of each segment, lowercased, append `-`). In a repo named `eng-package-management`, a skill called `deploy-checklist` triggers `→ suggested rename: epm-deploy-checklist`.
-  - **Multi-prefix repos:** if `.skills/_meta.yml` declares a `prefixes:` list (e.g. `[bld-, bin-]`), the script accepts **any** of those prefixes and ignores the auto-derived one. A violation message lists all declared prefixes so the user can pick the family the skill belongs to. Kit-bundled skills stay unprefixed in either mode.
+  - **Multi-prefix repos:** if `.skills/_meta.yml` declares a block `prefixes:` list, the script accepts **any** of those prefixes and ignores the auto-derived one. Use the block form supported by both migration auditing and split index generation:
+
+    ```yaml
+    prefixes:
+      - bld-
+      - bin-
+    ```
+
+    A violation message lists all declared prefixes so the user can pick the family the skill belongs to. Kit-bundled skills stay unprefixed in either mode.
 
   Renaming is a manual, deliberate step — the script never renames automatically because the index, frontmatter, and any cross-skill `dependencies` references all need to update together.
 - **Frontmatter shape**: each consumer SKILL.md is checked for the five required fields (`name`, `description`, `triggers`, `dependencies`, `version`) and that `name` matches the directory. Missing fields are reported so you can patch them up against the current `skill-template`.
@@ -72,8 +80,8 @@ The standard fix when adopting the official upstream:
 3. **Fix prefix and frontmatter issues** *before* the migration if possible — it keeps the index reconcile (step 6) cleaner. For each prefix warning:
    - `git mv .skills/_skills/<name> .skills/_skills/<prefix><name>`
    - Edit `<prefix><name>/SKILL.md` frontmatter: set `name: <prefix><name>`
-   - Update `.skills/_index.md` row name
    - Search for `dependencies:` mentions of the old name across `.skills/_skills/*/SKILL.md` and update them
+   - Run `.skills/_harness/build-index.sh --write` to regenerate configured index rows from frontmatter (or defer to step 6 if the old install lacks the generator)
    - Run `.skills/_harness/check.sh` to confirm
 
 4. **Apply** (clean working tree required; the script ignores its own untracked file and `*.bak/` dirs):
@@ -84,11 +92,11 @@ The standard fix when adopting the official upstream:
    .skills/_harness/migrate-to-subtree.sh --apply --force
    ```
 
-   To collapse steps 6–7 (manual `_index.md` reconcile and `_meta.yml` bump) into the same run, add `--reconcile`. To also generate `.skills/_skills/<name>/` shim symlinks when `consumer_skills_dir:` is declared, add `--symlink-consumer-skills`. Both are dry-run-friendly; preview first, then re-run with `--apply`.
+   To collapse steps 6–7 (index generation and `_meta.yml` bump) into the same run, add `--reconcile`. To also generate `.skills/_skills/<name>/` shim symlinks when `consumer_skills_dir:` is declared, add `--symlink-consumer-skills`. Both support dry-run; preview first, noting any unavailable-source limitations, then re-run with `--apply`.
 
-5. **Inspect the backups.** The script left `.skills/_harness.bak/` and any `.skills/_skills/<name>.bak/` directories so you can confirm nothing important was lost. Once happy, `rm -rf` them in a follow-up commit (or keep them on a separate branch).
+5. **Inspect the backups.** The script left `.skills/_harness.bak/` and any `.skills/_skills/<name>.bak/` directories so you can confirm nothing important was lost. Skill directories ending in `.bak` are excluded from catalog generation, validation, and native discovery. Once happy, `rm -rf` them in a follow-up commit (or keep them on a separate branch).
 
-6. **Reconcile `.skills/_index.md`.** Open `.skills-harness/.skills/_index.md` (the upstream, kit-only index) side by side with your `.skills/_index.md`. Make sure every kit-bundled skill row in the upstream index appears in your local index, and that every consumer-authored skill row in your local index is preserved. Do **not** simply overwrite — your local file is the union.
+6. **Regenerate the configured catalog.** Run `.skills/_harness/build-index.sh` to preview changes, then rerun with `--write`. Installed local skill frontmatter supplies every row, including consumer skills and retained local kit overrides. The generator updates the root table for single layout or child tables and root links for split layout, preserving prose outside generated regions. `--reconcile` performs this step automatically; do not copy upstream index rows.
 
 7. **Bump `.skills/_meta.yml`** `kit_version` to match `.skills-harness/.skills/_meta.yml` (or pin lower and document why).
 

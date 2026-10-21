@@ -1,6 +1,6 @@
 ---
 name: skill-reviewer
-description: "Review skill changes (SKILL.md, scripts/, references/, assets/) for quality, security, and harness layout. Use when a PR touches a skill or the user requests a skill review."
+description: "Reviews specific Agent Skills (SKILL.md and bundled resources) for quality, security, and layout. Use for a direct skill review or a skill-scoped check assigned by an authoring or repo review workflow. General code/PR reviews and /review or /codereview remain host-led; this skill only contributes scoped findings."
 triggers:
   - review skill
   - skill review
@@ -10,12 +10,20 @@ triggers:
   - review this skill
 dependencies:
   - skill-template
-version: "1.1.0"
+version: "1.3.0"
 ---
 
 # Skill Reviewer
 
-Review changes that add or modify Agent Skills. Skills load into agents' context windows and — when they bundle scripts — can trigger code execution. A malicious skill affects everyone who loads it; a sloppy skill burns tokens for everyone who loads it. Catch problems before merge.
+Review specified Agent Skills, especially new or changed ones. Skills load into agents' context windows and — when they bundle scripts — can trigger code execution. A malicious skill affects everyone who loads it; a sloppy skill burns tokens for everyone who loads it. Catch problems before merge.
+
+## When to use
+
+- Direct request to review one or more named skills, a `SKILL.md`, or a skill directory, including a new skill before registration or merge.
+- An authoring workflow's required review of the skill it just created or changed.
+- A broader repository review assigns a bounded skill-specific pass after identifying relevant skill changes. Return findings to that review; it continues covering the rest of the repository.
+
+A generic code review, PR review, `/review`, or `/codereview` does not select this skill as the overall reviewer. The presence of a skill file in a mixed diff is a reason to consider a scoped pass, not to replace the host's review. Preserve the caller's scope, output schema, severity convention, and overall verdict. A general review of this repository still covers its scripts, integrations, tests, and other code.
 
 Rubric sources (cite in review comments when recommending fixes):
 
@@ -33,13 +41,13 @@ Rubric sources (cite in review comments when recommending fixes):
 
 ## Scope
 
-Review files inside a skill directory — any folder under `.skills/_skills/<name>/` (or native discovery symlink target) containing a `SKILL.md`. Typical layout: `SKILL.md`, `scripts/`, `references/`, `assets/`. When a change touches more than one skill, review them jointly — bundled changes can split behavior across skills in ways individual reviews miss.
+Review the requested or assigned skill directories — folders containing a `SKILL.md`, including `.skills/_skills/<name>/` or their native discovery symlink targets. Typical layout: `SKILL.md`, `scripts/`, `references/`, `assets/`. Review multiple assigned skills jointly when their behavior interacts; do not expand to every skill in a repository merely because the parent review covers the whole repo.
 
-**Harness-specific checks:** frontmatter includes harness fields (`triggers`, `dependencies`, `version`); `name` matches directory; index row exists in `.skills/_index.md` when the skill is kit- or consumer-managed; resource paths referenced in `SKILL.md` exist (`check.sh` section 5). Run `.skills/_harness/check.sh` when validating locally.
+**Harness-specific checks:** frontmatter includes harness fields (`triggers`, `dependencies`, `version`); `name` matches directory; each kit- or consumer-managed skill has exactly one row in the configured catalog (`.skills/_index.md` for single layout, `.skills/_indexes/<group>.md` for split layout, with root links to those groups); resource paths referenced in `SKILL.md` exist (`check.sh` section 5). Run `.skills/_harness/check.sh` when validating locally.
 
-**Optional plugin surfaces:** when the diff touches hook configs, MCP server definitions, subagent definitions, or IDE plugin manifests (e.g. `.claude-plugin/`, `.cursor-plugin/`), load `references/plugin-checks.md`. Skip plugin checks for skill-only changes.
+**Optional plugin surfaces:** when hook configs, MCP server definitions, subagent definitions, or IDE plugin manifests (e.g. `.claude-plugin/`, `.cursor-plugin/`) are directly connected to the assigned skills, load `references/plugin-checks.md`. Unrelated plugin or infrastructure changes remain with the broader review.
 
-Do not comment on unrelated repo changes outside skill directories and optional plugin surfaces.
+Keep this pass's findings within its assigned scope. This restriction does not narrow the parent repository review; return to that review when the pass is complete.
 
 ## Severity and block conditions
 
@@ -49,7 +57,7 @@ Do not comment on unrelated repo changes outside skill directories and optional 
 | MEDIUM | Best-practice gap, token bloat | discretionary |
 | LOW | Style nit | no |
 
-Block merge when: any finding is HIGH; the diff touches this skill's own directory (self-referential — a skill cannot approve changes to its own rubric or pipeline; escalate to a human maintainer); the diff changes review pipeline assets outside the skill dir (e.g. `.skills/_harness/check.sh`); or you cannot complete the review (file unparseable, context exhausted — post partial findings and explain). To block, request changes and escalate HIGH security findings to the repo maintainer or security team per project policy. Never auto-approve.
+Report HIGH findings as blockers for the reviewed skill changes. When the assigned changes modify this skill's rubric or its review pipeline (e.g. `.skills/_harness/check.sh`), require independent human maintainer review of those changes; this skill cannot approve itself. If the pass is incomplete, report its coverage and missing checks. In a delegated pass, return findings and sign-off requirements to the parent review, which applies the repository's overall merge policy. Never auto-approve or submit hosted review actions without authorization.
 
 ## Risk-tier indicators
 
@@ -72,20 +80,20 @@ Classify the skill's overall risk before walking checks. Two or more HIGH indica
 
 ## Workflow
 
-- [ ] **Scope** — list files in the skill directory; read `SKILL.md` and frontmatter first.
+- [ ] **Scope** — identify the requested skills and whether this is a direct or delegated pass; list their files and read `SKILL.md` and frontmatter first. Preserve the parent review's coverage when delegated.
 - [ ] **Risk tier** — apply the indicator table above.
 - [ ] **Harness** — confirm index sync, `check.sh` layout, prefix rules for consumer-authored skills (see **skill-author**).
-- [ ] **Quality** — load `references/quality-checks.md` and walk Q1–Q7.
+- [ ] **Quality** — load `references/quality-checks.md` and walk Q1–Q7. For changed descriptions or discovery-cost findings, load [references/description-cost.md](references/description-cost.md); use [references/description-evals.json](references/description-evals.json) when evaluating its examples.
 - [ ] **Security** — load `references/security-checks.md` and walk checks 1–23. Use inline `grep`/`wc` for deterministic frontmatter checks; use judgment for the rest.
 - [ ] **Plugin surfaces** — when applicable, load `references/plugin-checks.md` and walk P1–P8.
-- [ ] **Output** — post the report per `references/output-format.md`. Group by severity. Block on any HIGH.
+- [ ] **Output** — return findings per `references/output-format.md`, preserving any caller-required schema. Identify HIGH blockers within this pass; do not issue a repo-wide verdict from a skill-only review.
 
 ## What not to do
 
 - Don't comment on harmless concision or style preferences. Flag compression only when it harms routing, disclosure, actor/order clarity, confirmation gates, or safety (Q1/Q2c).
 - Don't rewrite the skill for the author.
 - Don't fetch external URLs to verify references — flag the URL and move on.
-- Don't read files outside the diff except sibling skill directories when investigating chain references (check 17).
+- Read the assigned skill files and context needed to assess them, including bundled resources and relevant sibling skill chains (check 17). A direct skill review need not have a diff. If an investigation extends beyond this pass, return that follow-up to the parent reviewer without narrowing its scope.
 - Don't quote this rubric back at the author; summarize specific findings.
 - Never auto-approve. Skill changes need human approval in addition to this review.
 

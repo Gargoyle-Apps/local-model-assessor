@@ -5,6 +5,30 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.7.0] - 2026-10-20
+
+### Fixed
+
+- **Catalog generation and reconciliation ([#21](https://github.com/Gargoyle-Apps/skills-harness/issues/21)).** Generate catalog rows from installed skill frontmatter in both workflows, validate stale/duplicate/missing rows, and diagnose unsupported legacy multi-table layouts instead of silently preserving duplicates. Keep consumer routing prose outside generated regions.
+- **Caveman uninstall ([#19](https://github.com/Gargoyle-Apps/skills-harness/issues/19), `caveman` v1.3.3).** Remove managed absolute and relative symlinks after source skill removal or rename without deleting real files, directories, or foreign checkout links.
+- **Migration and backup handling.** Remove former kit shims only when their exact target proves ownership; exclude `.bak` and internal directories throughout migration, validation, native discovery, and conflict scanning (`skill-conflicts` v1.2.1). Repair previously exposed managed backup links while preserving backup contents and foreign entries. Legacy dry-runs continue when the generator is unavailable and report unavailable upstream sources explicitly.
+- **Generator configuration and diagnostics.** Accept inline YAML comments in supported index configuration, reject malformed split-prefix lists and inconsistent hyphenated names, preserve logical consumer paths under Bash physical mode, and refuse ambiguous dangling child indexes without deleting them. Quiet validation suppresses success output while retaining warnings and failure diffs.
+- **Optional-field indentation.** Diagnose misplaced `compatibility` and `metadata` keys after required scalar/list fields while preserving nested extension data and multiline scalar content; the bounded helper does not claim whole-document YAML validation.
+
+### Added
+
+- **Opt-in generated sub-indexes ([#21](https://github.com/Gargoyle-Apps/skills-harness/issues/21)).** Preserve the default single catalog; explicit split configuration adds a root directory of links and generated family indexes with a fallback group, dry-run diffs, ownership checks, and cross-index validation.
+- **Optional portability fields ([#17](https://github.com/Gargoyle-Apps/skills-harness/issues/17)).** Document and validate `compatibility` and flat string-to-string `metadata` when present, including `metadata.family` as an annotation rather than a routing gate. The zero-dependency validator diagnoses unsupported YAML forms.
+- **Catalog structure assessment ([#23](https://github.com/Gargoyle-Apps/skills-harness/issues/23), `skill-catalog-maintainer` v1.3.0).** Conditionally load an evidence-based reference for routing misses, whole-index reads, and independent family growth; reuse audit evidence, retain read-only assessment and explicit migration approval, and keep one index when a split is unsupported by evidence. Downstream consumer counts are not this kit's baseline or automatic split thresholds.
+- **Regression coverage.** Add generated-index, optional-frontmatter, dangling-link uninstall, migration-review, and pipeline-review fixtures to the Bash 3.2 smoke suite.
+
+### Changed
+
+- **Portable routing contract ([#17](https://github.com/Gargoyle-Apps/skills-harness/issues/17)).** `skill-author` v2.2.0, `skill-template` v1.5.0, README, and canonical rules require self-sufficient descriptions with relevant near-miss exclusions. Prefix families describe ownership/deployment; harness triggers cannot carry essential scope absent from descriptions. All ten templates now identify frontmatter as authoritative for generated rows.
+- **Discovery-cost review ([#22](https://github.com/Gargoyle-Apps/skills-harness/issues/22), `skill-reviewer` v1.3.0).** Separate native discovery, activation, and fallback costs; require concrete shortening proposals with character counts and preserved positive/near-miss routing. Include safe-shortening, justified-length, and rejected-compression examples without weakening existing safety or over-compression checks.
+- **Scoped review routing.** `skill-reviewer` v1.3.0 handles direct skill reviews or assigned skill-specific passes, preserving a parent repository review's scope, schema, and verdict. `caveman-review` v1.1.0 requires a requested terse style and no longer claims generic review phrases or `/review`. Canonical rules and all templates preserve host-led `/review` and `/codereview` workflows; skill-only reports no longer produce a repository approval footer.
+- **Consumer update guidance.** `harness-subtree` v1.7.0 and `harness-upgrade` v1.3.0 use local-frontmatter catalog generation for single and split layouts instead of copying upstream rows.
+
 ## [1.6.0] - 2026-08-17
 
 ### Fixed

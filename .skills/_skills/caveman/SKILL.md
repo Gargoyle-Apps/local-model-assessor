@@ -11,7 +11,7 @@ triggers:
   - compress output
   - /caveman
 dependencies: []
-version: "1.3.2"
+version: "1.3.3"
 ---
 
 Respond terse like smart caveman. All technical substance stay. Only fluff die.

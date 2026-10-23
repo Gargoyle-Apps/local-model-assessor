@@ -1,0 +1,24 @@
+{
+  "schema_version": "1.0",
+  "skill": "lma-model-field-guide",
+  "should_trigger": [
+    "Explain https://huggingface.co/deepseek-ai/DeepSeek-V4.1-Flash in plain language and write an untracked report on what everything means.",
+    "Decode this Hugging Face model page and its config.json for me so I understand the transformer terms.",
+    "If I was using this model on an Asus GX10, what option would I pick from the Hugging Face Use this model menu?",
+    "Generate a model field guide report for this new MoE checkpoint and explain its attention and KV cache compression.",
+    "What do CSA2, CED, Engram tables, and MXFP4 mean on this Hugging Face model card?",
+    "Update our model field guide skill with the new quantization conventions from https://huggingface.co/docs/transformers/quantization/concept_guide.",
+    "Walk me through the Browse Quantizations options for this model and explain EXL3 vs GGUF vs NVFP4 in simple terms.",
+    "Add this new attention mechanism from the technical report to the transformer lexicon in our field guide skill."
+  ],
+  "should_not_trigger": [
+    "Import qwen3:32b into model-assessor.db from model-data/new-models.yaml.",
+    "Which installed Ollama model in our database should I pick for coding in Cline?",
+    "Reply in ultra-terse caveman mode to save tokens.",
+    "Assess whether a Mac Studio M4 Ultra 192GB hardware SKU is worth buying for local AI.",
+    "Generate Continue and OpenCode config files from our active models.",
+    "Prune superseded models from Ollama and the database.",
+    "Run pytest on the ingestion scripts.",
+    "What skills exist in .skills/_index.md?"
+  ]
+}

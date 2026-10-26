@@ -7,14 +7,21 @@ Write the untracked report to `integrations/mcp/scout/<model-slug>-field-guide.m
 
 - **Source URL:** https://huggingface.co/<owner>/<repo>
 - **Generated on:** YYYY-MM-DD
-- **Target Hardware Context:** <Hardware name and mode, e.g., Simulated ASUS Ascent GX10 (128 GB unified memory)>
+- **Assessment target:** <hardware description or unknown>
+- **Profile source:** <supplied target / local profile path / selected DB and table / unavailable>
+- **Target status and evidence:** <actual / hypothetical / unknown; user statement or observation supporting this>
+- **Executing host relationship:** <same as target / different / unknown; no private host identifiers>
+- **Capacity inputs:** <units; memory type; node count; per-node physical memory and allocation ceiling; OS headroom; concurrency reserve; unknowns>
+- **Derived budget:** <per-node effective and co-run budgets; aggregate physical memory reported separately>
+- **Model/runtime evidence:** <resident weights, KV/context/concurrency, buffers, auxiliaries; OS/runtime support and evidence dates>
+- **Assumptions and missing inputs:** <conflicts, estimates, uncertainty; no inherited defaults>
 - **Authoritative Docs Referenced:** https://huggingface.co/docs
 
 ## 1. Executive Summary (Plain English)
 
 - **What this model is:** 2–3 sentences explaining the model's purpose, modalities, and headline innovation without jargon.
 - **The headline numbers vs. reality:** Total parameters vs. active parameters per token vs. actual disk/RAM size.
-- **Can you run it locally?** Direct verdict for the active hardware profile (single node vs. multi-node vs. SSD streaming vs. cloud API).
+- **Can you run it locally?** Conditional verdict for the assessment target, separating memory fit from runtime support. Explain per-node placement for distributed runs and verify offload support before suggesting it. If inputs are missing, say what remains unknown. Hosted services are external, not local feasibility results.
 
 ## 2. Architecture & Transformer Innovations Decoded
 

@@ -13,7 +13,7 @@ triggers:
   - data flow
   - key queries
 dependencies: []
-version: "1.1.0"
+version: "1.1.1"
 ---
 
 # LMA Database Core
@@ -27,7 +27,7 @@ Load when the user needs to initialize, migrate, or query the database; when a s
 ### 1. Database location
 
 - **Path:** `model-data/model-assessor.db` (SQLite).
-- **Env override:** All Python scripts respect `LMA_DB` to locate the DB file.
+- **Env override:** Python scripts, `migrate-schema.sh`, and `query-db.sh` respect `LMA_DB` to locate the DB file.
 
 ### 2. Init and migrate
 
@@ -45,6 +45,8 @@ If a script errors with "no such table" or "no such column," run `./scripts/migr
 ```
 
 Always pass the SQL as a quoted string argument. No args opens an interactive shell (avoid in agent workflows).
+
+For explanatory workflows, use `./scripts/query-db.sh --readonly "SQL"`. Missing databases, tables, or rows mean unavailable evidence: do not initialize, migrate, or import as part of explaining a model. An unavailable `LMA_DB` override must not silently fall back to the default DB.
 
 ### 4. Key queries
 
@@ -76,7 +78,7 @@ Always pass the SQL as a quoted string argument. No args opens an interactive sh
 
 - **Scripts (flags):** `query-db.sh "SQL"` — always pass SQL string. `init-db.sh` / `migrate-schema.sh` — empty DB / schema migrations.
 - **Python:** `./scripts/py scripts/<name>.py` (see `lma-python-env` skill). `add-model-from-yaml.py` — provenance via args or env. `export-assessed-models.py [path]`. `import-profiles.py [db]`. `generate-ide-config.py --target continue|cline [--active-only] [--dry-run]`. `sweep-ide-config.py` — run after model add/remove or clone create (see `lma-ide-config` skill). `generate-stack-handoff.py [--output-dir DIR]`.
-- **Env:** `LMA_DB` overrides the DB path for all Python scripts.
+- **Env:** `LMA_DB` overrides the DB path for Python scripts, `migrate-schema.sh`, and `query-db.sh`.
 
 ### 7. Hardware budget and co-run rule
 

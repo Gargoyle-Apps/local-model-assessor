@@ -2,6 +2,8 @@
 
 Load this reference when translating model cards, `config.json` parameters, quantization formats, benchmark tables, or Hugging Face Hub UI options into plain language, or when updating this skill with new technical conventions.
 
+Public model-specific numbers below illustrate the named architecture or source revision; they are not target hardware defaults or deployment verdicts. Recheck current model/runtime evidence before applying them. Updates must contain reusable, source-backed knowledge only: never copy local profiles, database contents, inventories, generated reports, profile-derived budgets, or local feasibility conclusions here. Keep those in the ignored field-guide report, including for hypothetical targets.
+
 ## Table of Contents
 
 1. [Authoritative Documentation Sources](#1-authoritative-documentation-sources)
@@ -84,12 +86,12 @@ Standard attention stores Key (K) and Value (V) tensors for every past token in 
 | **`BF16` / `FP16`** | 16 bpw (2 bytes/param) | Uncompressed inference precision. Used for norms, routers, embeddings, or vision towers even inside quantized checkpoints. |
 | **`FP8` (`E4M3` / `MXFP8`)** | ~8–8.25 bpw (~1 byte/param) | 8-bit floating point with block or microscaling (`ue8m0` scales). Supported natively on NVIDIA Hopper/Blackwell and modern server engines (`vLLM`, `SGLang`). |
 | **`MXFP4` / `NVFP4`** | ~4.25–4.5 bpw (~0.53 bytes/param) | 4-bit microscaling floating-point (`E2M1` values with shared block scales). `MXFP4` uses 32-element blocks with `UE8M0` scales; NVIDIA's `NVFP4` uses finer 16-element blocks with `E4M3` scales for higher accuracy on Blackwell Tensor Cores. |
-| **`EXL3` (ExLlamaV3 Trellis)** | 2.0–5.0 bpw (tunable mix, e.g. `2.7–3.0 bpw`) | Uses non-uniform trellis quantization (`MUL1` / `TR3` codebook) to give sensitive weights more bits and less-sensitive weights fewer bits. Popular for fitting large MoE models onto 1x or 2x NVIDIA DGX Spark / ASUS GX10 nodes via `SparkInfer` or custom `vLLM` plugins. |
-| **`REAP` (Router-weighted Expert Pruning)** | Expert-count reduction (e.g. `216 of 256` or `K154`) | Measures which MoE experts actually get picked during real coding and tool-use prompts, locks those in as mandatory, and removes the least-used experts (saving 15%–60% of RAM) so the model fits on a single 128 GB box. |
+| **`EXL3` (ExLlamaV3 Trellis)** | 2.0–5.0 bpw (tunable mix, e.g. `2.7–3.0 bpw`) | Uses non-uniform trellis quantization (`MUL1` / `TR3` codebook) to give sensitive weights more bits and less-sensitive weights fewer bits. Verify the derivative's runtime requirements and resident footprint against the selected target; compression alone does not establish single-node or distributed fit. |
+| **`REAP` (Router-weighted Expert Pruning)** | Expert-count reduction (e.g. `216 of 256` or `K154`) | Measures which MoE experts are selected during calibration prompts and removes less-used experts. Memory savings and quality depend on the derivative and calibration; expert pruning does not guarantee fit on any particular machine. |
 | **`PrismaQuant AQUA` / `GridBook` (`NVFP4_CB`, `FP8_CB`)** | ~2.35 bpw mixed codebook | Instead of deleting experts, assigns a custom lookup codebook (`CB`) to each layer based on how much errors hurt final output quality (4-bit codebooks on early layers, 8-bit codebooks on sensitive late layers). Runs in vanilla `vLLM` via the `gridbook` plugin. |
 | **`Unsloth Dynamic 2.0` (`UD-IQ2_XXS`, `UD-Q2_K_XL`)** | ~2.2–2.7 bpw dynamic GGUF | Smart `llama.cpp` GGUF compression where the "decision-making" parts (attention, routers, shared experts) stay at 8-bit/16-bit while the hundreds of specialist MoE experts are compressed to ~2 bits using a calibration importance matrix (`imatrix`). |
 | **`GGUF` (`Q2_K`, `IQ2_XXS`, `Q3_K_M`, `Q4_K_M`, `Q8_0`)** | ~2.1–8.5 bpw | Single-file (or split-shard) format for `llama.cpp`, `Ollama`, `LM Studio`, and `DwarfStar`. Uses an **importance matrix (`imatrix`)** during quantization so critical weights lose less precision at ultra-low bitrates like `Q2_K`. Note: `Q1_0` (1.125 bpw) frequently collapses on MoE models. |
-| **`MLX` (`oQ4e`, `4bit`, `8bit`)** | ~4.25–8.5 bpw | Apple Silicon unified-memory format using Metal kernels (`mlx-lm`, `oMLX`, or Ollama `-mlx` tags). Does not run on NVIDIA/Linux systems like the ASUS GX10. |
+| **`MLX` (`oQ4e`, `4bit`, `8bit`)** | ~4.25–8.5 bpw | Apple Silicon unified-memory model packs using Metal kernels (`mlx-lm`, `oMLX`, or Ollama `-mlx` tags). Verify the exact pack and runtime's target-platform support rather than inferring it from the Hub menu. |
 
 ---
 
@@ -113,13 +115,13 @@ Hugging Face renders the **"Use this model"** dropdown automatically from reposi
 
 | Menu Item | What It Actually Does | When to Pick It (and Local Hardware Gotchas) |
 |---|---|---|
-| **Libraries -> Transformers** | Shows a Python snippet using Hugging Face `transformers` (`AutoModelForCausalLM.from_pretrained`). | Best for reference code or small models. For 100B+ frontier MoEs with custom kernels (`mHC`, `CSA2`, `FP4`), plain `transformers` is often unsupported or far too slow/memory-hungry. |
-| **Inference -> Inference Providers / HuggingChat** | Sends API requests to hosted cloud clusters (Together, Fireworks, Novita, DeepInfra). | **Pick this when you want to test a massive model immediately** without downloading 200–500 GB or owning multi-node GPUs. (Note: LMA excludes cloud proxies from local DB imports, but you can use them to evaluate model behavior externally.) |
-| **Notebooks -> Google Colab / Kaggle** | Opens a cloud notebook template. | Free/pro notebook GPUs (16–80 GB VRAM) cannot load 400+ GB checkpoints. Only useful for API calls or tiny models. |
-| **Local Apps -> vLLM** | Generates a `vllm serve <org>/<model>` command. | **Primary choice for Linux + NVIDIA GPUs (including ASUS Ascent GX10 / DGX Spark)**, **provided** you pick a checkpoint/quantization that fits your node memory and a vLLM build that supports the model's custom ops. |
+| **Libraries -> Transformers** | Shows a Python snippet using Hugging Face `transformers` (`AutoModelForCausalLM.from_pretrained`). | Verify architecture, custom-kernel and quantization support in the selected version, then evaluate memory and workload requirements. |
+| **Inference -> Inference Providers / HuggingChat** | Sends requests to an external hosted service. | This is not execution on the assessment target. Explain the distinction; LMA does not assess, import, or recommend cloud-only proxies as local models. |
+| **Notebooks -> Google Colab / Kaggle** | Opens a cloud notebook template. | The notebook has its own hardware/runtime allocation; assess that separately from the user's local target rather than assuming a fixed memory tier. |
+| **Local Apps -> vLLM** | Generates a `vllm serve <org>/<model>` command. | Verify the selected build's OS, accelerator, architecture and quantization support, then check per-node memory and any distributed placement requirements. |
 | **Local Apps -> SGLang** | Generates a `python -m sglang.launch_server` command. | High-throughput alternative to `vLLM` on Linux + NVIDIA GPUs. Check whether the model requires a specific SGLang docker tag or revision. |
-| **Local Apps -> Docker Model Runner** | Runs packaged desktop container models. | Designed for workstation-sized GGUF/OCI models; will not fit a 400+ GB multi-node checkpoint on a single 128 GB node. |
-| **Footer -> Browse Quantizations** (`llama.cpp`, `Ollama`, `LM Studio`, EXL3, NVFP4) | Opens the Hub tree of community and vendor quantized derivatives (`base_model:quantized:...`). | **Mandatory stop for local hardware** whenever the upstream repo exceeds your VRAM/unified RAM budget. Look here for **EXL3 / NVFP4** (for NVIDIA `vLLM`), **GGUF** (for `llama.cpp` / `DwarfStar` / `Ollama`), or **MLX** (for Apple Silicon). Always verify in the quantized repo's README whether upstream `llama.cpp` / `Ollama` supports the architecture yet! |
+| **Local Apps -> Docker Model Runner** | Runs packaged container models. | Check model format, runtime support, accelerator access, and container memory limits on the assessment target. |
+| **Footer -> Browse Quantizations** (`llama.cpp`, `Ollama`, `LM Studio`, EXL3, NVFP4) | Opens the Hub tree of community and vendor quantized derivatives (`base_model:quantized:...`). | Compare derivative size, quality evidence, and runtime support when considering lower memory use. A smaller download does not by itself establish resident-memory fit or runtime compatibility. |
 
 ---
 
@@ -140,10 +142,10 @@ Hugging Face renders the **"Use this model"** dropdown automatically from reposi
 
 ## 9. Source Update Log
 
-When updating this lexicon from a new technical source, append a row below:
+When updating this lexicon from a new technical source, append a row below with a direct source and reusable concepts only. Review the diff for local context before saving; a source log must not preserve local assessment conclusions.
 
 | Date | Source URL / Artifact | Concepts Added or Updated |
 |---|---|---|
-| 2026-10-23 | `https://huggingface.co/docs` + `deepseek-ai/DeepSeek-V4.1-Flash` & quantized derivatives (`nvidia`, `0xSero`, `sudoingx`, `antirez`, `kyuz0`, `vcruz305`, `Jundot`) | Initial lexicon: CED, CSA2, SWA Bounded Replay, Single-Pass mHC, Engram conditional memory, DSpark MTP, MXFP4/NVFP4/EXL3/GGUF/oQ4e formats, KLD/ΔNLL metrics, and HF "Use this model" menu mapping for ASUS Ascent GX10 (GB10). |
-| 2026-10-23 | `deepseek-ai/DeepSeek-V4-Flash-0731` + single-GX10 derivatives (`0xSero/deepseek-v4-flash-0731-spark`, `rdtand/...-PrismaQuant-AQUA-gridbook-87GB-spark-vllm`, `unsloth/DeepSeek-V4-Flash-0731-GGUF`, `sayyidfareed/DeepSeek-V4.1-Flash-Next-DGX-Spark-512K`) | Added single-node 128 GB compression conventions: REAP expert pruning, Fixed-Expert Arena (`K154` / `CB3-v2`), PrismaQuant AQUA / GridBook mixed codebooks (`NVFP4_CB` / `FP8_CB`), and Unsloth Dynamic 2.0 (`UD-IQ2_XXS` / `UD-Q2_K_XL`). |
+| 2026-10-23 | `https://huggingface.co/docs` + `deepseek-ai/DeepSeek-V4.1-Flash` & quantized derivatives (`nvidia`, `0xSero`, `sudoingx`, `antirez`, `kyuz0`, `vcruz305`, `Jundot`) | Initial lexicon: CED, CSA2, SWA Bounded Replay, Single-Pass mHC, Engram conditional memory, DSpark MTP, MXFP4/NVFP4/EXL3/GGUF/oQ4e formats, KLD/ΔNLL metrics, and generic HF menu meanings. |
+| 2026-10-23 | `deepseek-ai/DeepSeek-V4-Flash-0731` and public quantized derivatives, including `unsloth/DeepSeek-V4-Flash-0731-GGUF` | Added compression conventions: REAP expert pruning, Fixed-Expert Arena (`K154` / `CB3-v2`), PrismaQuant AQUA / GridBook mixed codebooks (`NVFP4_CB` / `FP8_CB`), and Unsloth Dynamic 2.0 (`UD-IQ2_XXS` / `UD-Q2_K_XL`). |
 | 2026-10-24 | `https://huggingface.co/moonshotai/Kimi-K3` (`README.md`, `config.json`) + `https://www.kimi.ai/blog/kimi-k3-1-pro` + `https://huggingface.co/docs/transformers/quantization/compressed_tensors` | Added Kimi K3 / K3.1 Pro architecture conventions: KDA (Kimi Delta Attention 3:1 hybrid linear schedule), Gated MLA, AttnRes (Attention Residuals), Stable LatentMoE (`896` experts, `3584` latent dim), `SiTU-GLU` activation, `MoonViT-V2`, `compressed-tensors` QAT `MXFP4` weights / `MXFP8` activations, and Preserved Thinking History. |

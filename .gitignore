@@ -41,12 +41,15 @@ local/
 ref/
 
 # LMA local data
+# Actual and hypothetical assessments share these local-only paths.
+# Keep scripts/check-local-only.py, AGENTS.md, and README's Repo vs Local aligned.
 computer-profile/hardware-profile.yaml
 computer-profile/software-profile.yaml
 model-data/model-assessor.db
 model-data/assessed-models.md
 model-data/new-models.yaml
 model-data/*.db
+model-data/*.db-*
 model-data/modelfile/*
 !model-data/modelfile/.gitkeep
 model-data/model-lookup.json

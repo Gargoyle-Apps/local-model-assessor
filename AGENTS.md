@@ -8,7 +8,7 @@
 
 ### LMA version
 
-**`2.7.0`** — bump **MAJOR** for breaking paths, agent-facing contracts, or DB/schema expectations without a clear migration; **MINOR** for additive capability (e.g. new runtime, integration, or skills surface); **PATCH** for fixes and docs-only; keep **README.md** and this heading in sync; prefer non-`x.y.0` patch on intentional release lines.
+**`2.7.1`** — bump **MAJOR** for breaking paths, agent-facing contracts, or DB/schema expectations without a clear migration; **MINOR** for additive capability (e.g. new runtime, integration, or skills surface); **PATCH** for fixes and docs-only; keep **README.md** and this heading in sync; prefer non-`x.y.0` patch on intentional release lines.
 
 ---
 
@@ -25,7 +25,7 @@ This repository uses **Path B** from the bundled skills harness: **portable skil
 ## Non-negotiables
 
 - **Python:** Always run scripts via `./scripts/py scripts/<name>.py …` from the repo root. See `lma-python-env` skill for venv details.
-- **DB path:** `LMA_DB` env var overrides the default `model-data/model-assessor.db` for Python scripts and `migrate-schema.sh`.
+- **DB path:** `LMA_DB` env var overrides the default `model-data/model-assessor.db` for Python scripts, `migrate-schema.sh`, and `query-db.sh`. Explanatory workflows use `query-db.sh --readonly "SQL"` and do not initialize or migrate missing data.
 - **Queries:** `./scripts/query-db.sh "SQL"` — always pass SQL as a quoted string argument.
 - **If DB missing:** `./scripts/init-db.sh`. **If columns/tables missing:** `./scripts/migrate-schema.sh`.
 - **Tests:** `./scripts/py -m pytest tests/ -v` from repo root. Add tests for new helpers and ingestion paths. Dev deps: `pip install -r requirements-dev.txt`.
@@ -40,11 +40,15 @@ This repository uses **Path B** from the bundled skills harness: **portable skil
 | Type | Files |
 |------|-------|
 | **Tracked** | Templates (`*.template.yaml`), `LLM-prompts/`, scripts, `requirements.txt`, `Brewfile` (optional `libpq` via `brew bundle`), `AGENTS.md`, `.skills/` (consumer skills + `_index.md`; `_harness/` symlinked from subtree), `.skills-harness/` (skills-harness git subtree), `integrations/IDE-model-management/`, `integrations/embed-retrieval-stack/` (compose + `embed-retrieval-stack.md` + `versions.lock.yaml` + `.env.example`), `integrations/mcp/` (`huggingface-mcp.md`, `hf-hub-api.md`, `scout/.gitkeep`), `tests/`, `requirements-dev.txt` |
-| **Gitignored** | `.venv/`, `model-assessor.db`, `hardware-profile.yaml`, `software-profile.yaml`, `assessed-models.md`, `model-data/new-models.yaml`, `model-data/model-lookup.json`, `model-data/modelfile/*` (except `.gitkeep`), `.cursorrules`, `.agents/`, `.continue/`, `.opencode/`, `opencode.json`, `opencode.jsonc`, local config copies (`integrations/IDE-model-management/*/generated/*`, `integrations/IDE-model-management/continue/config.yaml`, `integrations/IDE-model-management/cline/provider-settings.json`, `integrations/IDE-model-management/opencode/opencode.json`, `integrations/IDE-model-management/pi/*.json`, `integrations/IDE-model-management/zed/settings.json`), `integrations/embed-retrieval-stack/out/`, `integrations/mcp/scout/*` (except `.gitkeep`), `ref/`, `.pytest_cache/` |
+| **Gitignored** | `.venv/`, `model-data/*.db` and SQLite sidecars (`*.db-*`), `computer-profile/hardware-profile.yaml`, `computer-profile/software-profile.yaml`, `model-data/assessed-models.md`, `model-data/new-models.yaml`, `model-data/model-lookup.json`, `model-data/modelfile/*` (except `.gitkeep`), `.cursorignore`, `.cursorrules`, `.agents/`, `.continue/`, `.opencode/`, `opencode.json`, `opencode.jsonc`, local config copies (`integrations/IDE-model-management/*/generated/*` except `.gitkeep`, `integrations/IDE-model-management/continue/config.yaml`, `integrations/IDE-model-management/cline/provider-settings.json`, `integrations/IDE-model-management/opencode/opencode.json`, `integrations/IDE-model-management/goose/config.yaml`, `integrations/IDE-model-management/pi/settings.json`, `integrations/IDE-model-management/pi/models.json`, `integrations/IDE-model-management/zed/settings.json`), `integrations/embed-retrieval-stack/out/`, `integrations/mcp/scout/*` (except `.gitkeep`), `ref/`, `.pytest_cache/` |
 
 Create local files from templates: `cp computer-profile/hardware-profile.template.yaml computer-profile/hardware-profile.yaml` (or use setup in `model-assessment-prompt.yaml`). For assessment output: `cp model-data/new-models.template.yaml model-data/new-models.yaml`.
 
 **Repo development vs using the repo:** End-user agents rely on this section matching **`.gitignore`** and the real tree. When you change ignore rules, add generated artifacts, or new local-only paths, update **this table** and **README.md** ("Repo vs Local") together so agents and humans stay aligned.
+
+**Content boundary:** Actual and hypothetical profiles, database contents, installed-model inventories, generated reports, and machine-specific results belong in the local-only paths above. Field guides and simulation reports use `integrations/mcp/scout/`. Shared skills, templates, and references may contain reusable procedures, documented contracts, source-backed public facts, and explicitly labeled synthetic examples, never implicit hardware defaults. Reference-update workflows must not copy local profiles or generated reports into tracked resources. Custom `LMA_DB` locations must also remain ignored and untracked.
+
+**Required review and validation:** For every skill, template, or reference change, inspect the diff for local values or feasibility conclusions promoted into shared guidance. Identify each hardware-specific claim's public source or synthetic purpose; keep profile-derived budgets and verdicts local. Run `./scripts/py scripts/check-local-only.py` alongside `.skills/_harness/check.sh`. The path check rejects tracked files matching active ignore rules (including force-added files) or the documented local-only patterns in that script. It cannot detect copied content in an otherwise valid shared path; content review remains required. Focused field-guide behavior evaluations are documented in `tests/evals/field-guide-context.md`.
 
 ---
 

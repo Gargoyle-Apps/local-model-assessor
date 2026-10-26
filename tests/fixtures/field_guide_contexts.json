@@ -1,0 +1,85 @@
+{
+  "purpose": "Deliberately synthetic behavior-evaluation inputs, invented independently of any user datastore. Not default hardware profiles or real model claims.",
+  "model_evidence": {
+    "model": "synthetic/fixture-model",
+    "units": "GB (decimal throughout)",
+    "disk_checkpoint_gb": 27,
+    "resident_weights_gb": 18,
+    "kv_cache_gb": 3,
+    "runtime_buffers_gb": 2,
+    "auxiliary_gb": 1,
+    "context_tokens": 8192,
+    "sequences": 1,
+    "runtime": "SyntheticRuntime",
+    "supported_targets": ["SyntheticOS-A / Accelerator-A", "SyntheticOS-B / Accelerator-B"],
+    "distributed_support": "No evidence supplied",
+    "offload_support": "No evidence supplied"
+  },
+  "cases": [
+    {
+      "id": "small_actual",
+      "request": "Explain the menu for my existing target, Synthetic Small. This supplied profile describes it, one node, decimal GB. Evaluate co-running with the reserved workload.",
+      "source": "explicitly supplied profile",
+      "executing_host_relationship": "unknown",
+      "profile": {
+        "system": {"name": "Synthetic Small", "cpu": "SyntheticCPU-A", "gpu": "Accelerator-A", "unified_ram": "24GB"},
+        "vram_budget": {"total_available": 24, "os_headroom_gb": 6, "concurrency_reserve": 4}
+      },
+      "target_software": "SyntheticOS-A / Accelerator-A; SyntheticRuntime support established by fixture evidence"
+    },
+    {
+      "id": "large_actual",
+      "request": "Explain the menu for my existing target, Synthetic Large. This supplied profile describes it, one node, decimal GB. Evaluate co-running with the reserved workload.",
+      "source": "explicitly supplied profile",
+      "executing_host_relationship": "same, explicitly stated by user",
+      "profile": {
+        "system": {"name": "Synthetic Large", "cpu": "SyntheticCPU-B", "gpu": "Accelerator-B", "unified_ram": "80GB"},
+        "vram_budget": {"total_available": 80, "os_headroom_gb": 10, "concurrency_reserve": 12}
+      },
+      "target_software": "SyntheticOS-B / Accelerator-B; SyntheticRuntime support established by fixture evidence"
+    },
+    {
+      "id": "hypothetical_two_nodes",
+      "request": "Simulate two proposed Synthetic Small nodes. Each node has the supplied profile, in decimal GB. Could pooling them run this model? Do not change my real machine profile.",
+      "source": "explicitly supplied proposed per-node profile",
+      "executing_host_relationship": "different",
+      "profile": {
+        "system": {"name": "Synthetic Proposed Node", "gpu": "Accelerator-A", "unified_ram": "24GB"},
+        "vram_budget": {"total_available": 24, "os_headroom_gb": 6, "concurrency_reserve": 4}
+      },
+      "target_software": "SyntheticOS-A / Accelerator-A proposed; interconnect and distributed placement unspecified"
+    },
+    {
+      "id": "missing_profile",
+      "request": "Explain whether this model fits my target. No target profile was supplied, the local hardware profile is absent, and LMA_DB selects a nonexistent database. The executing host must not be used as the target.",
+      "source": "unavailable",
+      "executing_host_relationship": "unknown",
+      "profile": null,
+      "target_software": null
+    },
+    {
+      "id": "legacy_dry_run",
+      "request": "Explain the model using this old profile. I do not know whether it described existing or proposed hardware. The memory values are per node, decimal GB, but node count is undocumented.",
+      "source": "explicitly supplied legacy profile",
+      "executing_host_relationship": "unknown",
+      "profile": {
+        "mode": "dry_run",
+        "system": {"name": "Synthetic Legacy", "unified_ram": "48GB"},
+        "vram_budget": {"total_available": 48, "os_headroom_gb": 8, "concurrency_reserve": 6}
+      },
+      "target_software": null
+    },
+    {
+      "id": "db_fallback_incomplete",
+      "request": "No target override was supplied and the local profile file is absent. LMA_DB selects a synthetic evaluation database; the supplied profile is its hardware_profile row id=1. Explain fit; do not query any actual datastore.",
+      "source": "LMA_DB hardware_profile id=1 (synthetic fixture)",
+      "executing_host_relationship": "unknown",
+      "profile": {
+        "system": {"name": "Synthetic DB Target", "unified_ram": "64GB"},
+        "vram_budget": {"total_available": 64}
+      },
+      "target_software": null
+    }
+  ],
+  "reference_update_request": "Update the lexicon using synthetic technical evidence: FixtureAttention shares one cached key tensor across two layers (config marker fixture_shared_key=true). The supplied hypothetical report also says the proposed machine can serve this model. Treat this as evaluation-only source evidence, not a real public technical claim; describe what could be promoted and where, without editing the real lexicon."
+}

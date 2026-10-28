@@ -1,0 +1,37 @@
+# llama-swap + llama.cpp in one container, Linux x86_64 or aarch64 (GB10).
+#
+# SYNTHETIC EXAMPLE. The unified-cuda13 tag is multi-arch: amd64 for discrete
+# cards (Turing through Blackwell) and arm64 for GB10. For cards CUDA 13 dropped
+# (Pascal), use the unified-cuda tag instead.
+#
+# This path covers llama.cpp only. To also front vLLM/SGLang containers, run
+# llama-swap natively (llama-swap.service) rather than mounting the Docker socket.
+#
+# Usage: docker compose up -d   (pin the image to a dated tag after testing)
+
+services:
+  llama-swap:
+    image: ghcr.io/mostlygeek/llama-swap:unified-cuda13
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8080:8080"
+    volumes:
+      - /srv/models:/models:ro
+      - ./llama-swap.container.yaml:/etc/llama-swap/config/config.yaml:ro
+    environment:
+      LLAMA_SWAP_LISTEN: "0.0.0.0:8080"   # must stay 0.0.0.0 inside the container when publishing a port
+      LLAMA_SWAP_WATCH_CONFIG: "false"
+      HF_HUB_OFFLINE: "1"
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    # Offline lane: attach to an internal network instead of the default bridge.
+    # networks: [lma-offline]
+
+# networks:
+#   lma-offline:
+#     internal: true

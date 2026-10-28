@@ -1,0 +1,180 @@
+# Inference-stack profiles and DRAFT routing rules (spike: optimize-lma)
+#
+# STATUS: hypothesis. No routing rule below is backed by benchmark data yet.
+# Each rule records the spike's working hypothesis so benchmarks can confirm or
+# refute it. Replace `status: hypothesis` with `status: measured` only after
+# results from scripts/bench-inference.py support the choice on real hardware.
+#
+# Traits are public platform facts, not budgets for any particular machine.
+# Machine-specific results stay in the gitignored results/ directory.
+#
+# Profile IDs must match scripts/detect-hardware-profile.py (tested).
+
+schema_version: 1
+
+profiles:
+  mac-16-24:
+    platform: macos-arm64
+    detect: "Apple M-series, unified memory <= 24 GB"
+    traits: "Tight memory; small dense models only"
+    candidate_engines: [llama.cpp, mlx-lm, omlx, ollama]
+    quantization_candidates: [mlx-4bit, gguf-q4_k_m]
+    containers: false    # Docker on macOS gets no Metal acceleration
+
+  mac-32-64:
+    platform: macos-arm64
+    detect: "Apple M-series, unified memory 32-64 GB"
+    traits: "Mid-size MoE models fit"
+    candidate_engines: [omlx, mlx-lm, vllm-metal, llama.cpp, ollama]
+    quantization_candidates: [mlx-4bit, mlx-8bit, gguf-q4_k_m, gguf-q8_0]
+    containers: false
+
+  mac-96plus:
+    platform: macos-arm64
+    detect: "Apple M-series, unified memory >= 96 GB"
+    traits: "High bandwidth; large MoE models"
+    candidate_engines: [vllm-metal, omlx, llama.cpp, ollama]
+    quantization_candidates: [mlx-4bit, mlx-8bit, gguf-q4_k_m, gguf-q8_0]
+    containers: false
+
+  gb10:
+    platform: linux-aarch64-cuda13
+    detect: "nvidia-smi name contains GB10, or compute capability 12.1 with memory.total N/A"
+    traits: "Arm CPU + integrated Blackwell (SM121); 128 GB LPDDR5x shared at 273 GB/s; DGX OS; decode is bandwidth-bound, so MoE models are favoured"
+    sources:
+      - https://www.asus.com/networking-iot-servers/desktop-ai-supercomputer/ultra-small-ai-supercomputers/asus-ascent-gx10/
+      - https://docs.nvidia.com/dgx/dgx-spark/known-issues.html
+    candidate_engines: [vllm, sglang, llama.cpp, ollama]
+    stretch_engines: [tensorrt-llm]
+    quantization_candidates: [fp8, nvfp4, mxfp4, awq, gguf]
+    containers: true
+
+  gb10-x2:
+    platform: linux-aarch64-cuda13
+    detect: "gb10 plus --nodes 2 (linked over ConnectX-7; not auto-detectable)"
+    traits: "Two GB10 nodes, model split across both"
+    candidate_engines: [vllm, sglang]
+    quantization_candidates: [fp8, nvfp4, mxfp4]
+    containers: true
+    stretch: true
+
+  nvidia-discrete:
+    platform: linux-x86_64-cuda
+    detect: "x86_64 Linux with an NVIDIA GPU reporting dedicated VRAM"
+    traits: "VRAM-limited, high bandwidth (e.g. RTX 3090/4090/5090, 24-32 GB)"
+    candidate_engines: [llama.cpp, vllm, sglang, ollama]
+    quantization_candidates:
+      ampere: [awq, gptq, gguf]          # RTX 30xx
+      ada: [fp8, awq, gguf]              # RTX 40xx
+      blackwell: [nvfp4, fp8, gguf]      # RTX 50xx
+    containers: true
+
+  fallback:
+    platform: any
+    detect: "AMD, Intel, CPU-only, Windows, Intel Macs, multi-GPU servers, non-GB10 Arm NVIDIA"
+    traits: "Out of scope for this spike"
+    candidate_engines: [ollama]
+    containers: null
+
+# Workloads (shapes are implemented in scripts/bench-inference.py)
+workloads:
+  W1: "Single-user chat: concurrency 1, ~2k-token prompt, ~500-token output"
+  W2: "Coding agent / multi-turn: concurrency 1-4, 8k-32k context, long shared prefix"
+  W3: "Parallel agents / small team: concurrency 8-16"
+  W4: "RAG support: embedding + reranker throughput, both kept loaded next to a chat model"
+  W5: "Optional: speech-to-text and image generation, loaded on demand via llama-swap"
+
+# Reference models. PROPOSED: ungated, keyless, and published in formats for
+# most engines. Confirm each exact file exists per engine before benchmarking
+# and record the revision with --model-file.
+reference_models:
+  small_dense:
+    id: Qwen3-8B
+    license: Apache-2.0
+    why: "NVIDIA-validated on Spark for TensorRT-LLM and SGLang (FP8/NVFP4); GGUF and MLX widely available"
+    files: {gguf: "Qwen/Qwen3-8B-GGUF", mlx: "mlx-community/Qwen3-8B-4bit", fp8: "nvidia/Qwen3-8B-FP8", nvfp4: "nvidia/Qwen3-8B-FP4"}
+  mid_moe:
+    id: NVIDIA-Nemotron-3.5-Lightning-30B-A3B
+    license: OpenMDW-1.1
+    why: "30B total / 3B active; official GGUF, NVFP4, BF16 and community FP8/MLX; Spark NIM default model"
+    files:
+      gguf: "ggml-org/NVIDIA-Nemotron-3.5-Lightning-30B-A3B-GGUF"
+      nvfp4: "nvidia/NVIDIA-Nemotron-3.5-Lightning-30B-A3B-NVFP4"
+      fp8: "RedHatAI/NVIDIA-Nemotron-3.5-Lightning-30B-A3B-FP8"
+      mlx: "mlx-community/NVIDIA-Nemotron-3.5-Lightning-30B-A3B-4bit"
+    alternate: "Qwen3.6-35B-A3B (Apache-2.0; NVIDIA's llama.cpp Spark playbook example)"
+  large_moe:
+    id: gpt-oss-120b
+    license: Apache-2.0
+    why: "Native MXFP4; validated on Spark for vLLM, SGLang and TensorRT-LLM; the engine comparison in the GB10 forum thread uses it"
+    profiles: [mac-96plus, gb10, gb10-x2]
+    files: {mxfp4: "openai/gpt-oss-120b", gguf: "ggml-org/gpt-oss-120b-GGUF"}
+    alternate: "NVIDIA-Nemotron-3-Super-120B-A12B-NVFP4 (newer; TensorRT-LLM Spark matrix)"
+  embedding:
+    id: Qwen3-Embedding-0.6B
+    license: Apache-2.0
+    why: "Ungated (EmbeddingGemma's HF repo is gated, which breaks the no-key rule)"
+    files: {gguf: "Qwen/Qwen3-Embedding-0.6B-GGUF"}
+  reranker:
+    id: bge-reranker-v2-m3
+    license: MIT
+    why: "XLM-RoBERTa reranker supported by llama.cpp --reranking and oMLX"
+
+# DRAFT routing rules: profile x workload -> front door, engine, quantization, key flags.
+# Every entry is the spike's starting hypothesis (status: hypothesis).
+routing:
+  default_router: llama-swap
+  default_router_rationale: "One OpenAI-compatible front door that starts/stops the right engine per request; can front llama.cpp, vLLM, SGLang and MLX servers"
+  tie_break: "Simpler stack wins (fewer engines, no containers)"
+
+  rules:
+    mac-16-24:
+      W1: {engine: mlx-lm, quant: mlx-4bit, fallback: llama.cpp, status: hypothesis}
+      W2: {engine: mlx-lm, quant: mlx-4bit, flags: "keep context <= 16k", status: hypothesis}
+      W3: {engine: none, note: "Concurrency 8-16 does not fit this tier; route to ollama with OLLAMA_NUM_PARALLEL=1", status: hypothesis}
+      W4: {engine: llama.cpp, flags: "--embedding / --reranking, persistent group", status: hypothesis}
+    mac-32-64:
+      W1: {engine: omlx, quant: mlx-4bit, fallback: llama.cpp, status: hypothesis, note: "vendor numbers favour oMLX at concurrency 1"}
+      W2: {engine: vllm-metal, quant: mlx-4bit, status: hypothesis, note: "vendor numbers favour vllm-metal at concurrency 2-4"}
+      W3: {engine: vllm-metal, quant: mlx-4bit, status: hypothesis}
+      W4: {engine: llama.cpp, flags: "--embedding / --reranking, persistent group", status: hypothesis}
+    mac-96plus:
+      W1: {engine: omlx, quant: mlx-4bit, status: hypothesis}
+      W2: {engine: vllm-metal, quant: mlx-4bit, status: hypothesis}
+      W3: {engine: vllm-metal, quant: mlx-4bit, status: hypothesis}
+      W4: {engine: llama.cpp, flags: "--embedding / --reranking, persistent group", status: hypothesis}
+    gb10:
+      W1: {engine: llama.cpp, quant: gguf, flags: "-fa on, -ngl 99, --parallel 1", status: hypothesis, confidence: low}
+      W2: {engine: sglang, quant: "fp8 or mxfp4 (test both)", flags: "RadixAttention prefix caching", status: hypothesis, confidence: low}
+      W3: {engine: vllm, quant: "fp8 or mxfp4 (test both)", flags: "--enable-prefix-caching, explicit --moe-backend", status: hypothesis, confidence: low}
+      W4: {engine: llama.cpp, flags: "--embedding / --reranking, persistent group", status: hypothesis}
+    gb10-x2:
+      W3: {engine: vllm, flags: "--tensor-parallel-size 2 --nnodes 2", status: hypothesis, stretch: true}
+    nvidia-discrete:
+      W1: {engine: llama.cpp, quant: gguf, flags: "--n-cpu-moe when the model exceeds VRAM", status: hypothesis}
+      W2: {engine: llama.cpp, quant: gguf, flags: "--parallel 4, -ctk q8_0 -ctv q8_0", status: hypothesis, note: "find the crossover where vLLM/SGLang win"}
+      W3: {engine: vllm, quant: "fp8 (Ada+) / nvfp4 (Blackwell) / awq (Ampere)", status: hypothesis}
+      W4: {engine: llama.cpp, flags: "fixed memory fractions vs swapping: benchmark both", status: hypothesis}
+    fallback:
+      default: {engine: ollama, note: "Ollama defaults; no routing rules for out-of-scope platforms"}
+
+# Ollama baseline starting points (the preference most users already have).
+# These are the settings to benchmark against, not recommendations.
+ollama_baseline:
+  all:
+    OLLAMA_NO_CLOUD: "1"
+    OLLAMA_FLASH_ATTENTION: "1"
+    OLLAMA_KV_CACHE_TYPE: "q8_0"
+  per_workload:
+    W1: {OLLAMA_NUM_PARALLEL: "1", OLLAMA_KEEP_ALIVE: "15m"}
+    W2: {OLLAMA_NUM_PARALLEL: "4", OLLAMA_CONTEXT_LENGTH: "32768"}
+    W3: {OLLAMA_NUM_PARALLEL: "16"}
+    W4: {OLLAMA_MAX_LOADED_MODELS: "3"}
+  verify:
+    - "On macOS, confirm which models Ollama runs on its MLX engine vs llama.cpp (spike context says 0.40+ uses MLX by default for supported models)"
+    - "Record `ollama --version` with every result; the MLX engine is still rolling out"
+
+# Recommended context length and concurrency per profile: TBD from benchmarks.
+memory_limits:
+  status: tbd
+  note: "Fill from bench-inference.py peak memory at each concurrency level; never copy a local result here without the source run"

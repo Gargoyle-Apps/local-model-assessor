@@ -1,6 +1,6 @@
 # Local Model Assessor
 
-**Version 2.11.0** — bump criteria: [AGENTS.md](AGENTS.md#lma-version).
+**Version 2.12.0** — bump criteria: [AGENTS.md](AGENTS.md#lma-version).
 
 For **tool-calling agents** in IDEs (Cursor, Cline, Continue, …): query SQLite and run repo scripts — not for chat-only LLMs without shell access.
 
@@ -10,7 +10,7 @@ For **tool-calling agents** in IDEs (Cursor, Cline, Continue, …): query SQLite
 
 ## Repo vs Local
 
-Ships **scripts, schema, templates** — empty `model-assessor.db` until you init, profile, assess. **`Brewfile`:** optional `brew bundle` → `libpq` (keg-only; see `brew info libpq`); not needed for Docker stack (`docker compose exec`). **Tracked:** templates under `computer-profile/`, `model-data/` (e.g. `*.template.yaml`, `modelfile/.gitkeep`), `scripts/`, `.skills/` + `.skills-harness/` (skills harness; see [Skills harness](#skills-harness-third-party)), `integrations/` (copy-out: IDE + embed stack + `mcp/scout/.gitkeep` + optional LMO contract). **Gitignored:** `computer-profile/hardware-profile.yaml`, `computer-profile/software-profile.yaml`, `model-data/*.db` and SQLite sidecars (`*.db-*`), `model-data/assessed-models.md`, `model-data/new-models.yaml`, `model-data/model-lookup.json`, generated modelfiles, `integrations/mcp/scout/*` (scout notes and field guides), `integrations/lmo/paths.yaml`, `integrations/lmo/allow-mock`, local IDE copies (`integrations/IDE-model-management/*/generated/*`, `continue/config.yaml`, `cline/provider-settings.json`, `opencode/opencode.json`, `goose/config.yaml`, `pi/settings.json`, `pi/models.json`, `zed/settings.json`; root `opencode.json` and `opencode.jsonc`), `integrations/embed-retrieval-stack/out/`, `ref/`, `.cursorignore`, `.cursorrules`, `.agents/`, `.continue/`, `.opencode/`, `.venv/`, `.pytest_cache/`. Generated IDE, modelfile, and scout `.gitkeep` placeholders remain tracked. Details: [AGENTS.md](AGENTS.md) + `.gitignore`.
+Ships **scripts, schema, templates** — empty `model-assessor.db` until you init, profile, assess. **`Brewfile`:** optional `brew bundle` → `libpq` (keg-only; see `brew info libpq`); not needed for Docker stack (`docker compose exec`). **Tracked:** templates under `computer-profile/`, `model-data/` (e.g. `*.template.yaml`, `modelfile/.gitkeep`), `scripts/`, `.skills/` + `.skills-harness/` (skills harness; see [Skills harness](#skills-harness-third-party)), `integrations/` (copy-out: IDE + embed stack + `mcp/scout/.gitkeep` + optional LMO contract + inference-stack profiles and reference configs). **Gitignored:** `computer-profile/hardware-profile.yaml`, `computer-profile/software-profile.yaml`, `model-data/*.db` and SQLite sidecars (`*.db-*`), `model-data/assessed-models.md`, `model-data/new-models.yaml`, `model-data/model-lookup.json`, generated modelfiles, `integrations/mcp/scout/*` (scout notes and field guides), `integrations/inference-stacks/results/*` (benchmark output), `integrations/lmo/paths.yaml`, `integrations/lmo/allow-mock`, local IDE copies (`integrations/IDE-model-management/*/generated/*`, `continue/config.yaml`, `cline/provider-settings.json`, `opencode/opencode.json`, `goose/config.yaml`, `pi/settings.json`, `pi/models.json`, `zed/settings.json`; root `opencode.json` and `opencode.jsonc`), `integrations/embed-retrieval-stack/out/`, `ref/`, `.cursorignore`, `.cursorrules`, `.agents/`, `.continue/`, `.opencode/`, `.venv/`, `.pytest_cache/`. Generated IDE, modelfile, scout, and benchmark-results `.gitkeep` placeholders remain tracked. Details: [AGENTS.md](AGENTS.md) + `.gitignore`.
 
 Actual and hypothetical assessments share this boundary: profiles, database contents, installed-model inventories, reports, and machine-specific conclusions stay local. Custom `LMA_DB` files must also be ignored and untracked. Shared procedures and references may use source-backed public facts or clearly labeled synthetic fixtures, with no assumed hardware target. Field guides record target, profile source, and actual/hypothetical/unknown status separately from the executing host; see the [hardware context contract](.skills/_skills/lma-model-field-guide/references/hardware-context.md). They read existing data without editing profiles or databases. `./scripts/query-db.sh --readonly "SQL"` honors `LMA_DB`.
 
@@ -60,6 +60,8 @@ cp -r /path/to/local-model-assessor .model-assessor
 │   ├── lma_paths.py                 # resolve DB + profile paths (optional LMO)
 │   ├── export-lmo-snapshot.py       # zip hardware/software/DB for LMO study
 │   ├── reconcile-inventory.py       # present/removed vs ollama list (+ history seed)
+│   ├── detect-hardware-profile.py   # map this machine to an inference-stack profile
+│   ├── bench-inference.py           # benchmark any OpenAI-compatible endpoint (W1-W4)
 │   └── query-db.sh
 ├── integrations/                    # copy-out kits: IDE configs + Docker data stack
 │   ├── embed-retrieval-stack/       # Postgres + pgvector + Apache AGE
@@ -81,9 +83,15 @@ cp -r /path/to/local-model-assessor .model-assessor
 │   │   ├── hf-hub-api.md            # REST + MCP hybrid; hf_hub_query gap
 │   │   ├── huggingface-mcp.md       # HF MCP setup + scout folder
 │   │   └── scout/                   # local discovery notes (gitignored except .gitkeep)
-│   └── lmo/                         # optional Local Model Orchestrator sidecar
-│       ├── lma-lmo-contract.md      # path-passing contract (LMA-side)
-│       └── paths.template.yaml      # copy to paths.yaml (gitignored) when LMO is cloned
+│   ├── lmo/                         # optional Local Model Orchestrator sidecar
+│   │   ├── lma-lmo-contract.md      # path-passing contract (LMA-side)
+│   │   └── paths.template.yaml      # copy to paths.yaml (gitignored) when LMO is cloned
+│   └── inference-stacks/            # spike: optimal stack per hardware profile
+│       ├── README.md                # method, hypothesis matrix, known issues
+│       ├── profiles.yaml            # profiles, reference models, draft routing rules
+│       ├── configs/                 # llama-swap, launchd, systemd, Compose references
+│       ├── eval/smoke.jsonl         # synthetic quality spot-check set
+│       └── results/                 # benchmark output (gitignored except .gitkeep)
 ├── ref/                             # local agent config copies (gitignored)
 ├── LLM-prompts/
 │   ├── model-assessment-prompt.yaml
@@ -190,6 +198,7 @@ What model should I use for [vision tasks / creative writing / RAG / etc.]?
 - **Postgres + pgvector + AGE:** [integrations/embed-retrieval-stack/embed-retrieval-stack.md](integrations/embed-retrieval-stack/embed-retrieval-stack.md) — pins, compose under `integrations/embed-retrieval-stack/`, use cases, troubleshooting. **Handoff** (`STACK_HANDOFF.md`, `embed_sample.py`): assessed **embedding** in DB → `./scripts/py scripts/generate-stack-handoff.py` → `integrations/embed-retrieval-stack/out/` (gitignored); copy stack + `out/` to your app.
 - **Hugging Face Hub:** [integrations/mcp/hf-hub-api.md](integrations/mcp/hf-hub-api.md) — **REST + MCP hybrid** (`hf-hub-api.py` for lists/collections; MCP for drill-down; **avoid `hf_hub_query`**). MCP setup: [integrations/mcp/huggingface-mcp.md](integrations/mcp/huggingface-mcp.md); scout notes in `integrations/mcp/scout/` (gitignored).
 - **Optional LMO sidecar:** [integrations/lmo/lma-lmo-contract.md](integrations/lmo/lma-lmo-contract.md) — local path passing with Local Model Orchestrator. See [Optional LMO sidecar](#optional-lmo-sidecar).
+- **Inference stacks (spike):** [integrations/inference-stacks/README.md](integrations/inference-stacks/README.md). It lists hardware profiles (Apple Silicon, GB10, discrete NVIDIA) and draft routing rules toward llama-swap plus llama.cpp, MLX engines, vLLM or SGLang. It also has reference configs and a re-runnable benchmark (`detect-hardware-profile.py`, `bench-inference.py`). Rules stay hypotheses until benchmarked; results stay local.
 
 ---
 

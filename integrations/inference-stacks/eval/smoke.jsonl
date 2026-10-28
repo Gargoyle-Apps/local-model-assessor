@@ -1,0 +1,8 @@
+{"id": "arith-1", "prompt": "What is 17 multiplied by 23? Reply with the number only.", "expect": ["391"], "max_tokens": 64}
+{"id": "arith-2", "prompt": "A train leaves at 09:40 and arrives at 13:05. How many minutes is the trip? Reply with the number only.", "expect": ["205"], "max_tokens": 64}
+{"id": "json-1", "prompt": "Return only a JSON object with keys \"name\" set to \"gx10\" and \"cores\" set to 20. No prose.", "expect": ["\"name\"", "gx10", "20"], "max_tokens": 64}
+{"id": "code-1", "prompt": "Write a Python function named is_even that returns True when n is even. Reply with code only.", "expect": ["def is_even", "% 2"], "max_tokens": 128}
+{"id": "code-2", "prompt": "In SQL, write a query that counts rows in a table named models. Reply with the query only.", "expect": ["count(", "from models"], "max_tokens": 64}
+{"id": "fact-1", "prompt": "What is the chemical symbol for sodium? Reply with the symbol only.", "expect": ["na"], "max_tokens": 32}
+{"id": "extract-1", "prompt": "From this sentence, return only the year: The GB10 platform shipped to developers in 2025.", "expect": ["2025"], "max_tokens": 32}
+{"id": "order-1", "prompt": "Sort these words alphabetically and return them comma-separated: pear, apple, mango.", "expect": ["apple", "mango", "pear"], "max_tokens": 64}

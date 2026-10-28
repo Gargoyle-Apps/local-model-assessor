@@ -1,0 +1,90 @@
+# llama-swap reference config: discrete NVIDIA on x86_64 (RTX 3090/4090/5090, 24-32 GB)
+#
+# SYNTHETIC EXAMPLE, status: hypothesis. Paths, image tags and memory fractions
+# are placeholders to benchmark, not recommendations.
+#
+# Layout matches ../gb10/: native llama-swap under systemd, native llama-server
+# (CUDA build for the card's architecture), vLLM/SGLang as containers.
+# Quantization by generation: Ampere AWQ/GPTQ, Ada FP8, Blackwell NVFP4; GGUF everywhere.
+
+healthCheckTimeout: 900
+startPort: 10001
+globalTTL: 1800
+
+macros:
+  models: "/srv/models"
+  vllm_image: "REPLACE_WITH_PINNED_VLLM_IMAGE"
+  llama: >-
+    /usr/local/bin/llama-server --host 127.0.0.1 --port ${PORT}
+    -ngl 99 -fa on --jinja
+
+models:
+  # --- W1/W2: llama.cpp ---------------------------------------------------------
+  chat-mid-gguf:
+    cmd: |
+      ${llama}
+      -m ${models}/gguf/NVIDIA-Nemotron-3.5-Lightning-30B-A3B-Q4_K_M.gguf
+      -c 32768 --parallel 4 -ctk q8_0 -ctv q8_0
+    disableKeepAlives: true
+
+  # Large MoE exceeds 24-32 GB VRAM: keep attention on the GPU and push some
+  # expert layers to system RAM. Tune the count per card.
+  chat-large-gguf:
+    cmd: |
+      ${llama}
+      -m ${models}/gguf/gpt-oss-120b-mxfp4.gguf
+      -c 16384 --parallel 1 --n-cpu-moe 24
+    disableKeepAlives: true
+
+  # --- W3: vLLM for concurrency ------------------------------------------------
+  chat-mid-vllm:
+    cmd: |
+      docker run --name ${MODEL_ID} --rm --gpus all --ipc=host
+      -e HF_HUB_OFFLINE=1 -e VLLM_NO_USAGE_STATS=1
+      -v ${models}:/models:ro -p ${PORT}:8000
+      --entrypoint vllm ${vllm_image}
+      serve /models/hf/NVIDIA-Nemotron-3.5-Lightning-30B-A3B-FP8
+      --served-model-name ${MODEL_ID} --host 0.0.0.0 --port 8000
+      --max-model-len 16384 --max-num-seqs 16
+      --gpu-memory-utilization 0.80 --enable-prefix-caching
+    cmdStop: docker stop ${MODEL_ID}
+    proxy: http://127.0.0.1:${PORT}
+    unloadTimeout: 60
+
+  # --- W4: utilities ------------------------------------------------------------
+  # Spike question: share the card with fixed fractions (vLLM 0.80 + these) or
+  # swap them. Benchmark both before choosing.
+  embed:
+    cmd: |
+      ${llama}
+      -m ${models}/gguf/Qwen3-Embedding-0.6B-Q8_0.gguf
+      --embedding --pooling last -c 8192 -ub 8192
+    disableKeepAlives: true
+    ttl: 0
+
+  rerank:
+    cmd: |
+      ${llama}
+      -m ${models}/gguf/bge-reranker-v2-m3-Q8_0.gguf
+      --reranking -c 8192 -ub 8192
+    disableKeepAlives: true
+    ttl: 0
+
+routing:
+  router:
+    use: group
+    settings:
+      groups:
+        chat:
+          swap: true
+          exclusive: false
+          members: [chat-mid-gguf, chat-large-gguf, chat-mid-vllm]
+        utility:
+          persistent: true
+          swap: false
+          exclusive: false
+          members: [embed, rerank]
+
+hooks:
+  on_startup:
+    preload: [embed, rerank]

@@ -1,0 +1,109 @@
+# llama-swap reference config: GB10 (ASUS Ascent GX10, DGX Spark, other OEMs)
+#
+# SYNTHETIC EXAMPLE, status: hypothesis, confidence: low. Paths, image tags and
+# memory fractions are placeholders to benchmark, not recommendations.
+#
+# Layout: llama-swap runs natively under systemd (../linux/llama-swap.service).
+# llama-server is a native CUDA build (CMAKE_CUDA_ARCHITECTURES=121a-real, per
+# NVIDIA's Spark playbook). vLLM and SGLang run as containers that llama-swap
+# starts with `docker run` and stops with `cmdStop`.
+#
+# Before benchmarking, record: DGX OS version, driver, CUDA, and each image digest.
+
+healthCheckTimeout: 1200     # vLLM/SGLang cold starts (CUDA graphs) can take minutes
+startPort: 10001
+globalTTL: 1800
+
+macros:
+  models: "/srv/models"
+  # Pin exact tags or digests. Candidates: upstream arm64/CUDA 13 images, or the
+  # images in NVIDIA's Spark playbooks. Public images only (no NGC key).
+  vllm_image: "REPLACE_WITH_PINNED_VLLM_IMAGE"
+  sglang_image: "REPLACE_WITH_PINNED_SGLANG_IMAGE"
+  llama: >-
+    /usr/local/bin/llama-server --host 127.0.0.1 --port ${PORT}
+    -ngl 99 -fa on --jinja
+  docker_gpu: >-
+    docker run --name ${MODEL_ID} --rm --gpus all --ipc=host
+    -e HF_HUB_OFFLINE=1 -v ${models}:/models:ro
+
+models:
+  # --- W1: single user, llama.cpp -------------------------------------------
+  chat-mid-gguf:
+    cmd: |
+      ${llama}
+      -m ${models}/gguf/NVIDIA-Nemotron-3.5-Lightning-30B-A3B-Q4_K_M.gguf
+      -c 32768 --parallel 1
+    disableKeepAlives: true
+
+  chat-large-gguf:
+    cmd: |
+      ${llama}
+      -m ${models}/gguf/gpt-oss-120b-mxfp4.gguf
+      -c 32768 --parallel 1
+    disableKeepAlives: true
+
+  # --- W2: agents with a long shared prefix, SGLang (RadixAttention) ---------
+  chat-large-sglang:
+    cmd: |
+      ${docker_gpu} -p ${PORT}:30000
+      --entrypoint python3 ${sglang_image}
+      -m sglang.launch_server --model-path /models/hf/gpt-oss-120b
+      --served-model-name ${MODEL_ID} --host 0.0.0.0 --port 30000
+      --mem-fraction-static 0.70
+    cmdStop: docker stop ${MODEL_ID}
+    proxy: http://127.0.0.1:${PORT}
+    unloadTimeout: 60
+
+  # --- W3: parallel agents, vLLM -----------------------------------------------
+  # On SM121, check the MoE backend line in the log: community reports describe a
+  # silent fallback to slow kernels for NVFP4 MoE unless a backend is forced.
+  chat-large-vllm:
+    cmd: |
+      ${docker_gpu} -e VLLM_NO_USAGE_STATS=1 -p ${PORT}:8000
+      --entrypoint vllm ${vllm_image}
+      serve /models/hf/gpt-oss-120b --served-model-name ${MODEL_ID}
+      --host 0.0.0.0 --port 8000
+      --max-model-len 32768 --max-num-seqs 16
+      --gpu-memory-utilization 0.70
+      --enable-prefix-caching
+    cmdStop: docker stop ${MODEL_ID}
+    proxy: http://127.0.0.1:${PORT}
+    unloadTimeout: 60
+
+  # --- W4: utilities stay resident --------------------------------------------
+  embed:
+    cmd: |
+      ${llama}
+      -m ${models}/gguf/Qwen3-Embedding-0.6B-Q8_0.gguf
+      --embedding --pooling last -c 8192 -ub 8192
+    disableKeepAlives: true
+    ttl: 0
+
+  rerank:
+    cmd: |
+      ${llama}
+      -m ${models}/gguf/bge-reranker-v2-m3-Q8_0.gguf
+      --reranking -c 8192 -ub 8192
+    disableKeepAlives: true
+    ttl: 0
+
+routing:
+  router:
+    use: group
+    settings:
+      groups:
+        # Unified memory is shared, so only one large chat engine at a time.
+        chat:
+          swap: true
+          exclusive: false
+          members: [chat-mid-gguf, chat-large-gguf, chat-large-sglang, chat-large-vllm]
+        utility:
+          persistent: true
+          swap: false
+          exclusive: false
+          members: [embed, rerank]
+
+hooks:
+  on_startup:
+    preload: [embed, rerank]

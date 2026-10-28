@@ -1,0 +1,34 @@
+# systemd unit for native llama-swap on Linux (x86_64 and aarch64 / GB10).
+# SYNTHETIC EXAMPLE. Install:
+#   sudo install -m 0644 llama-swap.service /etc/systemd/system/
+#   sudo install -d /etc/llama-swap && sudo cp ../gb10/llama-swap.yaml /etc/llama-swap/config.yaml
+#   sudo systemctl daemon-reload && sudo systemctl enable --now llama-swap
+# Binary: llama-swap release for linux_amd64 or linux_arm64.
+
+[Unit]
+Description=llama-swap: OpenAI-compatible front door for local inference engines
+After=network-online.target docker.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=llama
+Group=llama
+# Needed only when config.yaml starts vLLM/SGLang with `docker run`.
+# Docker group membership is root-equivalent; drop it for llama.cpp-only setups.
+SupplementaryGroups=docker
+Environment=HF_HUB_OFFLINE=1
+ExecStart=/usr/local/bin/llama-swap --config /etc/llama-swap/config.yaml --listen 127.0.0.1:8080
+Restart=on-failure
+RestartSec=5
+KillMode=mixed
+TimeoutStopSec=90
+
+# Offline lane: blocks egress for llama-swap and the native engines it starts.
+# Containers run under dockerd, not this unit, so block those with an
+# internal Docker network instead. Comment out during a download window.
+# IPAddressDeny=any
+# IPAddressAllow=localhost
+
+[Install]
+WantedBy=multi-user.target

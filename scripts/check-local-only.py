@@ -34,6 +34,7 @@ LOCAL_ONLY = (
     "integrations/IDE-model-management/zed/settings.json",
     "integrations/embed-retrieval-stack/out/*",
     "integrations/mcp/scout/*",
+    "integrations/inference-stacks/results/*",
     ".cursorrules", ".cursorignore", ".agents/*", ".continue/*", ".opencode/*",
     "opencode.json", "opencode.jsonc", ".venv/*", ".pytest_cache/*", "ref/*",
 )
@@ -41,6 +42,7 @@ KEEP_FILES = (
     "model-data/modelfile/.gitkeep",
     "integrations/IDE-model-management/*/generated/.gitkeep",
     "integrations/mcp/scout/.gitkeep",
+    "integrations/inference-stacks/results/.gitkeep",
 )
 
 

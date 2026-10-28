@@ -1,0 +1,103 @@
+# llama-swap reference config: macOS, Apple Silicon (profiles mac-16-24, mac-32-64, mac-96plus)
+#
+# SYNTHETIC EXAMPLE, status: hypothesis. Paths and model files are placeholders.
+# Pick models per tier from ../../profiles.yaml (reference_models). Native only:
+# Docker on macOS gets no Metal acceleration.
+#
+# Hypothesis under test: MLX engines serve the main LLMs; llama.cpp serves
+# embeddings, reranking and fallback. llama-swap is the single front door.
+#
+# Install:  brew tap mostlygeek/llama-swap && brew install llama-swap
+#           brew install llama.cpp
+#           MLX engines per ../../README.md (oMLX, mlx-lm, vllm-metal)
+# Run:      launchd, see com.lma.llama-swap.plist
+
+healthCheckTimeout: 600      # large MLX models can take minutes to load
+startPort: 10001
+globalTTL: 900               # unload idle chat models after 15 minutes
+
+macros:
+  models: "/Users/YOU/models"
+  # disableKeepAlives below works around llama-server closing keep-alive
+  # connections after a streamed response (llama-swap #1205).
+  llama: >-
+    llama-server --host 127.0.0.1 --port ${PORT}
+    -ngl 99 -fa on --jinja
+
+models:
+  # --- Main LLMs on MLX ------------------------------------------------------
+  # oMLX: vendor numbers favour it at concurrency 1 (W1). Unverified.
+  chat-mid-omlx:
+    cmd: omlx serve --model-dir ${models}/mlx --port ${PORT}
+    useModelName: "NVIDIA-Nemotron-3.5-Lightning-30B-A3B-4bit"
+    checkEndpoint: /v1/models
+
+  # vllm-metal: vendor numbers favour it at concurrency 2-4 (W2/W3). macOS 15+.
+  chat-mid-vllm-metal:
+    cmd: >-
+      vllm serve ${models}/mlx/NVIDIA-Nemotron-3.5-Lightning-30B-A3B-4bit
+      --host 127.0.0.1 --port ${PORT} --served-model-name ${MODEL_ID}
+    env:
+      - "HF_HUB_OFFLINE=1"
+      - "VLLM_NO_USAGE_STATS=1"
+    ttl: 1800
+
+  # mlx-lm: the simplest MLX server; baseline for mac-16-24.
+  chat-small-mlx:
+    cmd: >-
+      mlx_lm.server --model ${models}/mlx/Qwen3-8B-4bit
+      --host 127.0.0.1 --port ${PORT}
+    useModelName: "/Users/YOU/models/mlx/Qwen3-8B-4bit"   # mlx_lm.server names the model by its path
+    checkEndpoint: /v1/models
+
+  # --- llama.cpp: fallback chat plus utility models -------------------------
+  chat-small-gguf:
+    cmd: |
+      ${llama}
+      -m ${models}/gguf/Qwen3-8B-Q4_K_M.gguf
+      -c 16384 --parallel 1
+    disableKeepAlives: true
+
+  embed:
+    cmd: |
+      ${llama}
+      -m ${models}/gguf/Qwen3-Embedding-0.6B-Q8_0.gguf
+      --embedding --pooling last -c 8192 -ub 8192
+    disableKeepAlives: true
+    ttl: 0
+
+  rerank:
+    cmd: |
+      ${llama}
+      -m ${models}/gguf/bge-reranker-v2-m3-Q8_0.gguf
+      --reranking -c 8192 -ub 8192
+    disableKeepAlives: true
+    ttl: 0
+
+  # mac-96plus only: large MoE on vllm-metal.
+  # chat-large-vllm-metal:
+  #   cmd: >-
+  #     vllm serve ${models}/mlx/gpt-oss-120b-MXFP4 --host 127.0.0.1
+  #     --port ${PORT} --served-model-name ${MODEL_ID}
+  #   ttl: 1800
+
+routing:
+  router:
+    use: group
+    settings:
+      groups:
+        # One chat model at a time; loading one does not unload utilities.
+        chat:
+          swap: true
+          exclusive: false
+          members: [chat-mid-omlx, chat-mid-vllm-metal, chat-small-mlx, chat-small-gguf]
+        # Embedding and reranker stay resident next to the chat model (W4).
+        utility:
+          persistent: true
+          swap: false
+          exclusive: false
+          members: [embed, rerank]
+
+hooks:
+  on_startup:
+    preload: [embed, rerank]

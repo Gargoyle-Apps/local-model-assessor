@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  launchd agent for llama-swap on macOS. SYNTHETIC EXAMPLE: replace YOU with
+  your username (launchd does not expand ~). Install:
+    mkdir -p ~/.config/llama-swap && cp llama-swap.yaml ~/.config/llama-swap/config.yaml
+    cp com.lma.llama-swap.plist ~/Library/LaunchAgents/
+    launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.lma.llama-swap.plist
+  Remove:
+    launchctl bootout gui/$(id -u)/com.lma.llama-swap
+  PATH must include every engine binary that llama-swap.yaml launches.
+-->
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.lma.llama-swap</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/opt/homebrew/bin/llama-swap</string>
+    <string>--config</string>
+    <string>/Users/YOU/.config/llama-swap/config.yaml</string>
+    <string>--listen</string>
+    <string>127.0.0.1:8080</string>
+  </array>
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>PATH</key>
+    <string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin</string>
+    <key>HF_HUB_OFFLINE</key>
+    <string>1</string>
+  </dict>
+  <key>RunAtLoad</key>
+  <true/>
+  <key>KeepAlive</key>
+  <true/>
+  <key>StandardOutPath</key>
+  <string>/Users/YOU/Library/Logs/llama-swap.log</string>
+  <key>StandardErrorPath</key>
+  <string>/Users/YOU/Library/Logs/llama-swap.log</string>
+</dict>
+</plist>

@@ -1,0 +1,54 @@
+# llama-swap config for the unified container (docker-compose.yaml), llama.cpp only.
+# SYNTHETIC EXAMPLE: model files are placeholders under the /models mount.
+# Confirm the llama-server path inside the image before first use.
+
+healthCheckTimeout: 600
+globalTTL: 1800
+
+macros:
+  llama: >-
+    llama-server --host 127.0.0.1 --port ${PORT}
+    -ngl 99 -fa on --jinja
+
+models:
+  chat-mid-gguf:
+    cmd: |
+      ${llama}
+      -m /models/gguf/NVIDIA-Nemotron-3.5-Lightning-30B-A3B-Q4_K_M.gguf
+      -c 32768 --parallel 4
+    disableKeepAlives: true
+
+  embed:
+    cmd: |
+      ${llama}
+      -m /models/gguf/Qwen3-Embedding-0.6B-Q8_0.gguf
+      --embedding --pooling last -c 8192 -ub 8192
+    disableKeepAlives: true
+    ttl: 0
+
+  rerank:
+    cmd: |
+      ${llama}
+      -m /models/gguf/bge-reranker-v2-m3-Q8_0.gguf
+      --reranking -c 8192 -ub 8192
+    disableKeepAlives: true
+    ttl: 0
+
+routing:
+  router:
+    use: group
+    settings:
+      groups:
+        chat:
+          swap: true
+          exclusive: false
+          members: [chat-mid-gguf]
+        utility:
+          persistent: true
+          swap: false
+          exclusive: false
+          members: [embed, rerank]
+
+hooks:
+  on_startup:
+    preload: [embed, rerank]

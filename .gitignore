@@ -69,6 +69,8 @@ integrations/embed-retrieval-stack/out/
 
 integrations/mcp/scout/*
 !integrations/mcp/scout/.gitkeep
+integrations/inference-stacks/results/*
+!integrations/inference-stacks/results/.gitkeep
 integrations/lmo/paths.yaml
 integrations/lmo/allow-mock
 

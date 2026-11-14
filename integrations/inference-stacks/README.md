@@ -20,6 +20,7 @@
 | [configs/nvidia-discrete/](configs/nvidia-discrete/) | llama-swap config for 24–32 GB cards, including MoE expert offload |
 | [configs/linux/](configs/linux/) | systemd unit (x86_64 and aarch64), multi-arch Compose file and container config |
 | [eval/smoke.jsonl](eval/smoke.jsonl) | Synthetic quality spot-check set |
+| [result-format.md](result-format.md) | Versioned result/provenance contract, comparison readiness and measurement limits |
 | `results/` | Benchmark output. **Local only (gitignored):** results are machine-specific |
 | [scripts/detect-hardware-profile.py](../../scripts/detect-hardware-profile.py) | Maps this machine's signals to a profile ID |
 | [scripts/bench-inference.py](../../scripts/bench-inference.py) | Re-runnable benchmark for any OpenAI-compatible endpoint |
@@ -36,27 +37,29 @@ All configs are **synthetic examples**: paths, image tags and memory fractions a
 
 2. **Start a fresh server** for one engine × model × quantization, either directly or behind llama-swap.
 
-3. **Run each workload.** Every run records the engine version, driver, OS, model file and quantization:
+3. **Run each workload.** Explicitly identify whether the server is local or remote. Supply deployment metadata for comparable evidence; see the [result contract](result-format.md). This synthetic command illustrates a confirmed local endpoint; replace version/model/artifact values and the PID with observed values:
 
    ```bash
    ./scripts/py scripts/bench-inference.py --base-url http://127.0.0.1:8080 \
      --workload W1 --model chat-mid-gguf --router llama-swap \
-     --engine llama.cpp --engine-version b7966 --quant Q4_K_M \
-     --model-file NVIDIA-Nemotron-3.5-Lightning-30B-A3B-Q4_K_M.gguf \
-     --pid "$(pgrep -f llama-server | head -1)" --quality-set integrations/inference-stacks/eval/smoke.jsonl
+     --engine llama.cpp --engine-version '<observed-build>' --quant '<observed-quant>' \
+     --model-file '<served-artifact>' --server-location local \
+     --metadata integrations/inference-stacks/results/metadata/deployment.json \
+     --reasoning-mode disabled \
+     --pid '<server-pid>' --quality-set integrations/inference-stacks/eval/smoke.jsonl
    ```
 
    | Workload | Extra flags |
    |---|---|
-   | W2 | `--prompt-tokens 8000` up to `32000` |
+   | W2 | `--prompt-tokens <target>`; reserve context for output and template overhead |
    | W3 | `--concurrency 8 16` (the default) |
-   | W4 | `--embed-model embed --rerank-model rerank` (add `--model` to check the chat model stays loaded) |
+   | W4 | `--embed-model embed --rerank-model rerank` (add `--model` for before/after chat probes; these do not prove residency) |
    | Cold start | `--measure-cold-start`, immediately after starting the server |
    | Model swap | `--swap-from <other-model>` behind llama-swap or Ollama |
 
    Ollama baseline: `--base-url http://127.0.0.1:11434 --engine ollama --engine-version "$(ollama --version)"`.
 
-4. **Read the results.** Output lands in `results/` as one JSON file per run.
+4. **Read the results.** Output lands in `results/` as one UUID-named JSON file per run, with version, completion status, effective parameters and comparison issues. Legacy records remain readable as incomplete evidence. Local memory sampling requires a confirmed local server; a remote server never inherits the client's hardware observation.
 
 **Metrics:**
 - Per concurrency level, p50/p95 of: time to first token, prefill tok/s and decode tok/s.
@@ -65,9 +68,9 @@ All configs are **synthetic examples**: paths, image tags and memory fractions a
 
 **Method rules:**
 - Fresh server per run, with warmup.
-- Greedy sampling (`temperature 0`) with a fixed seed.
-- W1/W3 prompts carry a nonce so prefix caches miss; W2 shares one long prefix so they hit.
-- Token counts come from the server's usage report when available; otherwise streamed chunks are counted and flagged `usage_source: chunks`.
+- Greedy sampling (`temperature 0`, `top_p 1`) with a fixed seed by default; override explicitly for the model and record reasoning mode and template options.
+- W1/W3 prompts carry a nonce to reduce prefix reuse; W2 supplies a shared prefix. Actual cache behavior requires server evidence.
+- Token counts come from the server's usage report when available; otherwise streamed chunks are counted and flagged `usage_source: chunks`, which blocks comparison readiness. See the [metric definitions and limitations](result-format.md#effective-parameters-and-metrics).
 
 ## Draft decision matrix (hypothesis, no evidence yet)
 

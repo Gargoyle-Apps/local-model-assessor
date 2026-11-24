@@ -1,6 +1,6 @@
 # Local Model Assessor
 
-**Version 2.7.1** — bump criteria: [AGENTS.md](AGENTS.md#lma-version).
+**Version 2.7.2** — bump criteria: [AGENTS.md](AGENTS.md#lma-version).
 
 For **tool-calling agents** in IDEs (Cursor, Cline, Continue, …): query SQLite and run repo scripts — not for chat-only LLMs without shell access.
 
@@ -178,7 +178,7 @@ What model should I use for [vision tasks / creative writing / RAG / etc.]?
 
 ## IDE + embed stack
 
-- **IDEs:** [integrations/IDE-model-management/IDE.md](integrations/IDE-model-management/IDE.md) — roles, timeouts, Continue (`~/.continue/config.yaml`) / Cline-Roo (JSON), others; `sweep-ide-config.py` / `generate-ide-config.py`; see [`lma-ide-config`](.skills/_skills/lma-ide-config/SKILL.md) skill.
+- **IDEs:** [integrations/IDE-model-management/IDE.md](integrations/IDE-model-management/IDE.md) — roles, timeouts, Continue (`~/.continue/config.yaml`) / Cline-Roo (JSON), others; `sweep-ide-config.py` / `generate-ide-config.py`; see [`lma-ide-config`](.skills/_skills/lma-ide-config/SKILL.md) skill. [Zed configuration](integrations/IDE-model-management/zed/config-location.md) covers UI and JSONC customization plus manual Ollama, llama.cpp, and LM Studio setup.
 - **Postgres + pgvector + AGE:** [integrations/embed-retrieval-stack/embed-retrieval-stack.md](integrations/embed-retrieval-stack/embed-retrieval-stack.md) — pins, compose under `integrations/embed-retrieval-stack/`, use cases, troubleshooting. **Handoff** (`STACK_HANDOFF.md`, `embed_sample.py`): assessed **embedding** in DB → `./scripts/py scripts/generate-stack-handoff.py` → `integrations/embed-retrieval-stack/out/` (gitignored); copy stack + `out/` to your app.
 - **Hugging Face Hub:** [integrations/mcp/hf-hub-api.md](integrations/mcp/hf-hub-api.md) — **REST + MCP hybrid** (`hf-hub-api.py` for lists/collections; MCP for drill-down; **avoid `hf_hub_query`**). MCP setup: [integrations/mcp/huggingface-mcp.md](integrations/mcp/huggingface-mcp.md); scout notes in `integrations/mcp/scout/` (gitignored).
 

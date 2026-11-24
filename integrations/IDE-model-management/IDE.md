@@ -291,20 +291,20 @@ Pi supports a single active model but can cycle between configured models with C
 
 ## Zed (Editor)
 
-**Docs:** [Zed AI — LLM Providers](https://zed.dev/docs/ai/llm-providers), [Configuration](https://zed.dev/docs/ai/configuration)
-**Config file:** `settings.json` — see [zed/config-location.md](zed/config-location.md)
+**Docs:** [Local models](https://zed.dev/docs/ai/use-a-local-model), [Agent settings](https://zed.dev/docs/ai/agent-settings)
+**Config file:** `settings.json` (JSONC) — see [zed/config-location.md](zed/config-location.md) for UI vs file customization, keybindings, tasks, and local providers.
 **Default location:** `~/.config/zed/settings.json` (global) or `.zed/settings.json` (project)
 
-Zed auto-discovers pulled Ollama models, but explicit `available_models` lets you set per-model context length, tool support, vision, and thinking capabilities.
+Zed supports local Ollama, llama.cpp, and LM Studio providers. For Ollama, explicit `available_models` entries let you override discovered context and capability metadata. Zed's settings UI and JSONC files both expose customization; files also make configuration changes easy to review and reproduce.
 
 ### Role mapping → Zed
 
 | DB query | Zed config |
 |----------|-----------|
-| `role='coding', variant='primary'` | `assistant.default_model` (main agent model) |
-| All assessed Ollama models | Listed in `language_models.ollama.available_models` |
+| Installed clone for `role='coding', variant='primary'` | `agent.default_model` (main agent model) |
+| Installed conversational Ollama aliases | Listed in `language_models.ollama.available_models` |
 
-Map DB columns to Zed's per-model fields: `tools` → `supports_tools`, `vision` → `supports_images`, `reasoning` → `supports_thinking`, `ctx` → `max_tokens`.
+Map DB columns to Zed's Ollama per-model fields: `tools` → `supports_tools`, `vision` → `supports_images`, `reasoning` → `supports_thinking`, provisioned `num_ctx` → `max_tokens`. Exclude embedding-only models from the chat list. The example below is synthetic; replace the alias and context with an installed, assessed choice.
 
 ### Config block template
 
@@ -313,6 +313,8 @@ Map DB columns to Zed's per-model fields: `tools` → `supports_tools`, `vision`
   "language_models": {
     "ollama": {
       "api_url": "http://localhost:11434",
+      "auto_discover": true,
+      "context_window": 8192,
       "available_models": [
         {
           "name": "model:tag",
@@ -326,23 +328,25 @@ Map DB columns to Zed's per-model fields: `tools` → `supports_tools`, `vision`
       ]
     }
   },
-  "assistant": {
+  "agent": {
     "default_model": {
       "provider": "ollama",
       "model": "model:tag"
-    },
-    "version": "2"
+    }
   }
 }
 ```
 
 ### Setup steps (on-demand)
 
-1. Query DB for all assessed models and role assignments
-2. Generate `language_models.ollama.available_models` array (map `ctx` → `max_tokens`, `tools`/`vision`/`reasoning` → `supports_*`)
-3. Set `assistant.default_model` to the primary coding model
-4. Merge into `~/.config/zed/settings.json` (global) or `.zed/settings.json` (project)
-5. Optionally save a copy to `integrations/IDE-model-management/zed/settings.json` as local reference
+For initial setup and later updates, follow the [reference-driven configuration workflow](zed/config-location.md#reference-driven-configuration-updates). It covers version checks, JSONC merges, validation, and the full Zed settings reference beyond local-model configuration.
+
+1. Query DB for installed conversational aliases and role assignments.
+2. Build `language_models.ollama.available_models` using each alias's `num_ctx` and assessed capabilities.
+3. Set `agent.default_model` to the installed primary coding alias.
+4. Configure optional llama.cpp or LM Studio provider URLs to match their local servers; see [provider settings](zed/config-location.md#local-model-providers).
+5. Back up and merge into user `~/.config/zed/settings.json`, preserving unrelated preferences. Keep supported project-specific overrides separate.
+6. Optionally save a copy to `integrations/IDE-model-management/zed/settings.json` as local reference. Zed is currently configured manually; the automatic sweep handles Continue and Cline/Roo.
 
 ---
 
